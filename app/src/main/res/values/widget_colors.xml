@@ -1,0 +1,6 @@
+<resources>
+    <color name="widget_primary">#795600</color>
+    <color name="widget_foreground">#0A0907</color>
+    <color name="widget_secondary">#665B46</color>
+    <color name="widget_overdue">#B3261E</color>
+</resources>
