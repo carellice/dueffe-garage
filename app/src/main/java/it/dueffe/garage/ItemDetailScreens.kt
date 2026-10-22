@@ -7,7 +7,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,11 +25,13 @@ import java.util.Locale
     Text(section.uppercase(Locale.ITALY), color = MaterialTheme.colorScheme.primary, fontSize = 11.sp,
         letterSpacing = 2.sp, fontWeight = FontWeight.Black)
     Spacer(Modifier.height(3.dp))
-    Text(title, fontSize = 31.sp, lineHeight = 35.sp, fontWeight = FontWeight.Black)
+    Text(title, fontSize = 33.sp, lineHeight = 36.sp, fontWeight = FontWeight.Black, letterSpacing = (-.5).sp)
     Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
     Spacer(Modifier.height(6.dp))
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(62.dp).background(appearance.background, CircleShape), contentAlignment = Alignment.Center) {
+        val pop = remember { Animatable(.4f) }
+        LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = .45f, stiffness = Spring.StiffnessLow)) }
+        Box(Modifier.size(62.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }.background(appearance.background, CircleShape), contentAlignment = Alignment.Center) {
             Icon(painterResource(appearance.icon), contentDescription = null, tint = appearance.tint, modifier = Modifier.size(31.dp))
         }
         Text(appearance.label, color = appearance.tint, fontWeight = FontWeight.Bold,
@@ -47,14 +53,11 @@ import java.util.Locale
 }
 
 @Composable private fun ItemDetailCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(17.dp), content = content)
-    }
+    GlassCard(Modifier.fillMaxWidth().staggerIn(2), padding = 17.dp, content = content)
 }
 
 @Composable private fun ItemDetailActions(onEdit: () -> Unit, onDelete: () -> Unit, editLabel: String, deleteLabel: String) {
-    Button(onClick = onEdit, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {
+    GradientButton(onClick = onEdit, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {
         Icon(painterResource(R.drawable.ic_edit), contentDescription = null, modifier = Modifier.size(19.dp))
         Spacer(Modifier.width(8.dp))
         Text(editLabel, fontWeight = FontWeight.Bold)
@@ -167,7 +170,7 @@ import java.util.Locale
                 ItemDetailFact("Intervento collegato", "${maintenanceLabel(linked)} · ${dateLabel(linked.date)}", R.drawable.ic_wrench)
             }
         }
-        Button(onClick = onOpenFile, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {
+        GradientButton(onClick = onOpenFile, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {
             Text("Apri file", fontWeight = FontWeight.Bold)
         }
         OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {

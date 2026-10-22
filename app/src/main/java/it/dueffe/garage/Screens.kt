@@ -16,6 +16,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +53,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
@@ -141,32 +148,30 @@ internal fun vehicleTypeLabel(type: String) = vehicleTypes[type] ?: "Altro"
     val statusLabel = when (v.status) { "sold" -> "Venduta"; "scrapped" -> "Rottamata"; else -> "Attiva" }
     LazyColumn(Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (!sectionsPage) item {
-            Box(Modifier.fillMaxWidth().height(if (v.photo != null) 212.dp else 72.dp)) {
+            Box(Modifier.fillMaxWidth().height(if (v.photo != null) 250.dp else 72.dp)) {
                 if (v.photo != null) {
-                    val photoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) with(sharedTransitionScope) {
-                        Modifier.sharedElement(rememberSharedContentState("photo-${v.id}"), animatedVisibilityScope, boundsTransform = BoundsTransform { _, _ -> tween(300, easing = FastOutSlowInEasing) }).fillMaxSize()
-                    } else Modifier.fillMaxSize()
-                    VehicleImage(v.photo, photoModifier.clip(RoundedCornerShape(22.dp)))
+                    val photoModifier = Modifier.fillMaxSize()
+                    VehicleImage(v.photo, photoModifier.clip(RoundedCornerShape(28.dp)))
+                    Box(Modifier.matchParentSize().clip(RoundedCornerShape(28.dp)).background(Brush.verticalGradient(0f to Color.Black.copy(alpha = .35f), .3f to Color.Transparent, .7f to Color.Transparent, 1f to Color.Black.copy(alpha = .35f))))
                 }
-                val backModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) with(sharedTransitionScope) { with(animatedVisibilityScope) {
-                    Modifier.renderInSharedTransitionScopeOverlay(zIndexInOverlay = 2f)
-                        .animateEnterExit(enter = fadeIn(tween(160, delayMillis = 60)), exit = fadeOut(tween(120)))
-                } } else Modifier
+                val backModifier = Modifier
                 GarageBackButton(backLabel, onClose, Modifier.align(Alignment.TopStart).padding(12.dp).then(backModifier))
             }
         }
         if (sectionsPage) item { GarageBackButton("Dettaglio auto", onClose) }
         item { Column(Modifier.padding(horizontal = 2.dp, vertical = 2.dp)) {
-            Text("LA TUA AUTO", color = accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Black)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(18.dp).height(3.dp).clip(CircleShape).background(accentGradient()))
+                Spacer(Modifier.width(8.dp))
+                Text(if (sectionsPage) "DIARIO" else "LA TUA AUTO", color = accent, fontSize = 11.sp, letterSpacing = 2.4.sp, fontWeight = FontWeight.Black)
+            }
             Spacer(Modifier.height(4.dp))
-            val titleModifier = if (!sectionsPage && sharedTransitionScope != null && animatedVisibilityScope != null) with(sharedTransitionScope) {
-                Modifier.sharedBounds(rememberSharedContentState("title-${v.id}"), animatedVisibilityScope, enter = fadeIn(tween(180)), exit = fadeOut(tween(140)), boundsTransform = BoundsTransform { _, _ -> tween(300, easing = FastOutSlowInEasing) })
-            } else Modifier
-            Text(if (sectionsPage) "La vita della tua auto" else v.name, modifier = titleModifier, fontSize = 32.sp, lineHeight = 35.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val titleModifier = Modifier
+            Text(if (sectionsPage) "La vita della tua auto" else v.name, modifier = titleModifier, fontSize = 34.sp, lineHeight = 37.sp, fontWeight = FontWeight.Black, letterSpacing = (-.6).sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(if (sectionsPage) "${v.name} · Interventi, scadenze, documenti e note" else "${v.make} ${v.model}".trim(), color = muted, fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         } }
         if (!sectionsPage) item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+            GlassCard(Modifier.fillMaxWidth(), padding = 0.dp) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 15.dp)) {
                 VehiclePlate(v.plate, v.vehicleType, v.registrationDate.take(4).toIntOrNull() ?: v.year, Modifier.align(Alignment.CenterHorizontally))
                 Spacer(Modifier.height(16.dp)); HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .17f)); Spacer(Modifier.height(13.dp))
@@ -197,21 +202,23 @@ internal fun vehicleTypeLabel(type: String) = vehicleTypes[type] ?: "Altro"
             }
             }
         }
-        if (!sectionsPage) item { Button(onClick = onOpenSections, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {
+        if (!sectionsPage) item { GradientButton(onClick = onOpenSections, modifier = Modifier.fillMaxWidth().height(56.dp).then(
+            if (sharedTransitionScope != null && animatedVisibilityScope != null) Modifier.containerTransform("sections-page-${v.id}", sharedTransitionScope, animatedVisibilityScope) else Modifier), shape = RoundedCornerShape(28.dp), shine = true) {
             Icon(painterResource(R.drawable.ic_wrench), contentDescription = null, modifier = Modifier.size(21.dp))
-            Spacer(Modifier.width(9.dp)); Text("Interventi, scadenze, documenti e note", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Spacer(Modifier.width(9.dp)); Text("Interventi, scadenze, documenti e note", fontSize = 13.sp, fontWeight = FontWeight.Black, maxLines = 1)
         } }
         if (sectionsPage) item {
             val sections = listOf("Interventi" to R.drawable.ic_wrench, "Scadenze" to R.drawable.ic_calendar_nav, "Documenti" to R.drawable.ic_document, "Note" to R.drawable.ic_note)
-            BoxWithConstraints(Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .52f), RoundedCornerShape(32.dp)).padding(2.dp)) {
+            BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surface).border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .18f), RoundedCornerShape(32.dp)).padding(3.dp)) {
                 val segmentWidth = maxWidth / sections.size
-                val indicatorX by animateDpAsState(segmentWidth * sections.indexOfFirst { it.first == tab }.coerceAtLeast(0), tween(350, easing = FastOutSlowInEasing), label = "scheda_selezionata")
-                Box(Modifier.offset(x = indicatorX).width(segmentWidth).height(43.dp).background(accent, RoundedCornerShape(28.dp)))
+                val indicatorX by animateDpAsState(segmentWidth * sections.indexOfFirst { it.first == tab }.coerceAtLeast(0), spring(dampingRatio = .7f, stiffness = Spring.StiffnessMediumLow), label = "scheda_selezionata")
+                Box(Modifier.offset(x = indicatorX).width(segmentWidth).height(43.dp).clip(RoundedCornerShape(28.dp)).background(accentGradient()))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     sections.forEach { (label, icon) ->
                         val isSelected = tab == label
-                        val textColor by animateColorAsState(if (isSelected) MaterialTheme.colorScheme.onPrimary else muted, tween(260), label = "colore_$label")
-                        val iconColor by animateColorAsState(if (isSelected) MaterialTheme.colorScheme.onPrimary else accent, tween(260), label = "icona_$label")
+                        val onAccent = if (LocalGarageDark.current) Black else Color.White
+                        val textColor by animateColorAsState(if (isSelected) onAccent else muted, tween(260), label = "colore_$label")
+                        val iconColor by animateColorAsState(if (isSelected) onAccent else accent, tween(260), label = "icona_$label")
                         Row(Modifier.weight(1f).height(43.dp).clip(RoundedCornerShape(28.dp)).clickable(role = Role.Tab) { setTab(label) }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                             Icon(painterResource(icon), contentDescription = null, tint = iconColor, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
@@ -223,7 +230,7 @@ internal fun vehicleTypeLabel(type: String) = vehicleTypes[type] ?: "Altro"
         }
         if (sectionsPage) when (tab) {
             "Interventi" -> {
-                item(key = "interventi-add") { Box(Modifier.animateItem()) { Button(onClick = onAddMaintenance, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("＋", fontSize = 24.sp); Spacer(Modifier.width(8.dp)); Text("Registra intervento", fontWeight = FontWeight.Bold) } } }
+                item(key = "interventi-add") { Box(Modifier.animateItem()) { GradientButton(onClick = onAddMaintenance, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("＋", fontSize = 24.sp); Spacer(Modifier.width(8.dp)); Text("Registra intervento", fontWeight = FontWeight.Bold) } } }
                 if (maintenances.isNotEmpty()) {
                     item(key = "interventi-search") { Box(Modifier.animateItem()) { OutlinedTextField(query, { query = it }, placeholder = { Text("Cerca interventi") }, leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null, modifier = Modifier.size(22.dp)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(17.dp)) } }
                     item(key = "interventi-filters") { Box(Modifier.animateItem()) { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -255,7 +262,7 @@ internal fun vehicleTypeLabel(type: String) = vehicleTypes[type] ?: "Altro"
                 items(filteredReminders, key = { "reminder-${it.reminder.id}" }) { r -> Box(Modifier.animateItem()) { ReminderListCard(r) { onOpenReminder(r) } } }
             }
             "Documenti" -> {
-                item(key = "documenti-add") { Box(Modifier.animateItem()) { Button(onClick = onAddDocument, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("＋", fontSize = 24.sp); Spacer(Modifier.width(8.dp)); Text("Aggiungi documento", fontWeight = FontWeight.Bold) } } }
+                item(key = "documenti-add") { Box(Modifier.animateItem()) { GradientButton(onClick = onAddDocument, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("＋", fontSize = 24.sp); Spacer(Modifier.width(8.dp)); Text("Aggiungi documento", fontWeight = FontWeight.Bold) } } }
                 if (docs.isNotEmpty()) item(key = "documenti-search") { Box(Modifier.animateItem()) { OutlinedTextField(query, { query = it }, placeholder = { Text("Cerca documenti") }, leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null, modifier = Modifier.size(22.dp)) }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(17.dp)) } }
                 if (docs.isNotEmpty()) item(key = "documenti-filters") { Box(Modifier.animateItem()) { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     listOf("all", "insurance", "inspection", "tax", "service", "other").forEach { category ->
@@ -307,9 +314,7 @@ private fun notesUpdatedLabel(value: String): String = if (value.isBlank()) "Mai
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val heading: @Composable () -> Unit = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.size(59.dp).background(Color(0xFFFFF0D2), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(painterResource(R.drawable.ic_note), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(29.dp))
-                    }
+                    GradientIcon(R.drawable.ic_note, 56.dp, 27.dp)
                     Column {
                         Text("Appunti", fontSize = 27.sp, lineHeight = 30.sp, fontWeight = FontWeight.Black)
                         Text("Note e promemoria sulla tua auto.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
@@ -338,7 +343,7 @@ private fun notesUpdatedLabel(value: String): String = if (value.isBlank()) "Mai
                 unfocusedBorderColor = MaterialTheme.colorScheme.outline
             )
         )
-        Button(onClick = onSave, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {
+        GradientButton(onClick = onSave, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {
             Text("Salva note", fontSize = 17.sp, fontWeight = FontWeight.Bold)
         }
     }
@@ -346,13 +351,19 @@ private fun notesUpdatedLabel(value: String): String = if (value.isBlank()) "Mai
 
 internal data class MaintenanceAppearance(val label: String, val icon: Int, val tint: Color, val background: Color)
 
-internal fun maintenanceAppearance(type: String) = when (type) {
-    "service" -> MaintenanceAppearance("Tagliando", R.drawable.ic_wrench, Color(0xFF1B405A), Color(0xFFE8F1FF))
-    "inspection" -> MaintenanceAppearance("Revisione", R.drawable.ic_settings_nav, Color(0xFF15583A), Color(0xFFE3F3E6))
-    "tax" -> MaintenanceAppearance("Bollo", R.drawable.ic_receipt, Color(0xFF9A4D0D), Color(0xFFFFEBD8))
-    "insurance" -> MaintenanceAppearance("Assicurazione", R.drawable.ic_shield, Color(0xFF805400), Color(0xFFFFF0D2))
-    "tires" -> MaintenanceAppearance("Cambio gomme", R.drawable.ic_tire, Color(0xFF6C287A), Color(0xFFF0E6FA))
-    else -> MaintenanceAppearance("Altro", R.drawable.ic_more, Color(0xFF66563C), Color(0xFFF1ECE3))
+private fun appearance(label: String, icon: Int, tint: Color, background: Color, darkTint: Color, dark: Boolean) =
+    if (dark) MaintenanceAppearance(label, icon, darkTint, darkTint.copy(alpha = .16f)) else MaintenanceAppearance(label, icon, tint, background)
+
+@Composable internal fun maintenanceAppearance(type: String): MaintenanceAppearance {
+    val dark = LocalGarageDark.current
+    return when (type) {
+        "service" -> appearance("Tagliando", R.drawable.ic_wrench, Color(0xFF1B5A8A), Color(0xFFE5F0FF), Color(0xFF7DB8FF), dark)
+        "inspection" -> appearance("Revisione", R.drawable.ic_settings_nav, Color(0xFF15703F), Color(0xFFE0F5E6), Color(0xFF6FE0A0), dark)
+        "tax" -> appearance("Bollo", R.drawable.ic_receipt, Color(0xFFB4530B), Color(0xFFFFEAD6), Color(0xFFFFA45C), dark)
+        "insurance" -> appearance("Assicurazione", R.drawable.ic_shield, Color(0xFF8A5C00), Color(0xFFFFF0CC), Color(0xFFFFD84D), dark)
+        "tires" -> appearance("Cambio gomme", R.drawable.ic_tire, Color(0xFF7B2D8E), Color(0xFFF3E6FA), Color(0xFFD69CFF), dark)
+        else -> appearance("Altro", R.drawable.ic_more, Color(0xFF66563C), Color(0xFFF1ECE3), Color(0xFFCDBB98), dark)
+    }
 }
 
 @Composable private fun ReminderFilterPill(type: String, selected: Boolean, onClick: () -> Unit) {
@@ -362,7 +373,7 @@ internal fun maintenanceAppearance(type: String) = when (type) {
         Modifier.height(43.dp).clip(shape)
             .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
             .border(1.dp, if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.outline.copy(alpha = .38f), shape)
-            .clickable(onClick = onClick).padding(horizontal = 14.dp),
+            .bouncyClick(onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (type != "all") Icon(painterResource(appearance.icon), contentDescription = null,
@@ -403,11 +414,9 @@ internal fun reminderSubtitle(item: DueReminder): String {
     }
 }
 
-@Composable private fun ReminderListCard(item: DueReminder, onClick: () -> Unit) {
-    val appearance = maintenanceAppearance(item.maintenance.type)
-    val dueDate = reminderDueDate(item)
+internal fun reminderStatus(item: DueReminder): String {
     val remaining = item.days
-    val status = when {
+    return when {
         item.reminder.type == "mileage" && item.kmLeft != null && item.kmLeft <= 0 -> "Da effettuare"
         item.reminder.type == "mileage" && item.kmLeft != null -> "Tra ${item.kmLeft.formatKm()}"
         remaining == null -> "Da verificare"
@@ -416,31 +425,34 @@ internal fun reminderSubtitle(item: DueReminder): String {
         remaining == 1L -> "Tra 1 giorno"
         else -> "Tra $remaining giorni"
     }
-    val statusTint = when {
-        remaining == null -> Color(0xFF66563C)
-        remaining < 0 -> Color(0xFFB3261E)
-        remaining <= 60 -> Color(0xFFAF4C13)
-        remaining <= 100 -> Color(0xFF925900)
-        else -> Color(0xFF16446E)
-    }
-    val statusBackground = when {
-        remaining == null -> Color(0xFFF1ECE3)
-        remaining < 0 -> Color(0xFFFFE8E5)
-        remaining <= 60 -> Color(0xFFFFEDE1)
-        remaining <= 100 -> Color(0xFFFFF0D2)
-        else -> Color(0xFFE2F0FF)
-    }
+}
+
+@Composable internal fun ReminderListCard(item: DueReminder, modifier: Modifier = Modifier, showVehicle: Boolean = false, onClick: () -> Unit) {
+    val appearance = maintenanceAppearance(item.maintenance.type)
+    val dueDate = reminderDueDate(item)
+    val status = reminderStatus(item)
+    val urgency = urgencyFor(item.days)
+    val statusTint = urgency.color
+    val statusBackground = urgency.color.copy(alpha = .14f)
+    val pulse = rememberInfiniteTransition(label = "urgent")
+    val glow by pulse.animateFloat(.35f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "urgent_glow")
+    val urgent = (item.days ?: Long.MAX_VALUE) < 0
+    val shape = RoundedCornerShape(22.dp)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surface)
-            .clickable(onClickLabel = "Apri scadenza ${appearance.label}", onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
+        modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, if (urgent) statusTint.copy(alpha = .25f + .35f * glow) else MaterialTheme.colorScheme.outline.copy(alpha = .1f), shape)
+            .bouncyClick(onClickLabel = "Apri scadenza ${appearance.label}", onClick = onClick)
+            .drawBehind { drawRect(statusTint, size = Size(4.dp.toPx(), size.height)) }
+            .padding(start = 16.dp, end = 12.dp, top = 13.dp, bottom = 13.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Box(Modifier.size(57.dp).background(appearance.background, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(painterResource(appearance.icon), contentDescription = null, tint = appearance.tint, modifier = Modifier.size(29.dp))
+        Box(Modifier.size(54.dp).background(appearance.background, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(painterResource(appearance.icon), contentDescription = null, tint = appearance.tint, modifier = Modifier.size(27.dp))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(appearance.label, modifier = Modifier.clip(RoundedCornerShape(15.dp)).background(appearance.background)
+            if (showVehicle) Text(item.vehicle.name.uppercase(Locale.ITALY), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp,
+                letterSpacing = 1.5.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            else Text(appearance.label, modifier = Modifier.clip(RoundedCornerShape(15.dp)).background(appearance.background)
                 .padding(horizontal = 9.dp, vertical = 2.dp), color = appearance.tint, fontSize = 11.sp,
                 fontWeight = FontWeight.Bold, maxLines = 1)
             Text(when (item.maintenance.type) { "service" -> "Tagliando periodico"; "tax" -> "Bollo auto"; else -> maintenanceLabel(item.maintenance) },
@@ -477,7 +489,7 @@ internal fun reminderSubtitle(item: DueReminder): String {
         Modifier.height(43.dp).clip(shape)
             .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
             .border(1.dp, if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.outline.copy(alpha = .38f), shape)
-            .clickable(onClick = onClick).padding(horizontal = 14.dp),
+            .bouncyClick(onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (type != "all") Icon(painterResource(appearance.icon), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(19.dp))
@@ -501,12 +513,9 @@ internal fun documentCategory(document: GarageDocument, maintenances: List<Maint
     }
 }
 
-internal fun documentAppearance(category: String) = when (category) {
-    "insurance" -> MaintenanceAppearance("Assicurazione", R.drawable.ic_shield, Color(0xFF805400), Color(0xFFFFF0D2))
-    "inspection" -> maintenanceAppearance("inspection")
-    "tax" -> maintenanceAppearance("tax")
-    "service" -> maintenanceAppearance("service")
-    else -> MaintenanceAppearance("Altro", R.drawable.ic_more, Color(0xFF6C287A), Color(0xFFF0E6FA))
+@Composable internal fun documentAppearance(category: String) = when (category) {
+    "insurance", "inspection", "tax", "service" -> maintenanceAppearance(category)
+    else -> maintenanceAppearance("tires").copy(label = "Altro", icon = R.drawable.ic_more)
 }
 
 @Composable private fun DocumentFilterPill(category: String, selected: Boolean, onClick: () -> Unit) {
@@ -516,7 +525,7 @@ internal fun documentAppearance(category: String) = when (category) {
         Modifier.height(43.dp).clip(shape)
             .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
             .border(1.dp, if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.outline.copy(alpha = .38f), shape)
-            .clickable(onClick = onClick).padding(horizontal = 13.dp),
+            .bouncyClick(onClick = onClick).padding(horizontal = 13.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Icon(painterResource(if (category == "all") R.drawable.ic_folder else appearance.icon), contentDescription = null,
@@ -587,7 +596,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
     var menuOpen by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surface)
-            .clickable(onClickLabel = "Apri ${document.name}", onClick = onOpen)
+            .bouncyClick(onClickLabel = "Apri ${document.name}", onClick = onOpen)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -635,7 +644,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
     val shape = RoundedCornerShape(22.dp)
     Column(
         Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
-            .clickable(onClickLabel = "Apri dettaglio intervento", onClick = onOpen)
+            .bouncyClick(onClickLabel = "Apri dettaglio intervento", onClick = onOpen)
             .padding(horizontal = 15.dp, vertical = 14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -684,7 +693,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
 
 @Composable private fun DetailAction(label: String, icon: Int, onClick: () -> Unit, modifier: Modifier = Modifier, destructive: Boolean = false) {
     val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-    Column(modifier.clip(RoundedCornerShape(15.dp)).clickable(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.clip(RoundedCornerShape(15.dp)).bouncyClick(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(38.dp).background(if (destructive) color.copy(alpha = .1f) else MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape), contentAlignment = Alignment.Center) {
             Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
         }
@@ -696,9 +705,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
 @Composable private fun DetailEmptyState(title: String, subtitle: String) {
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(23.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(52.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(painterResource(R.drawable.ic_document), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(27.dp))
-            }
+            GradientIcon(R.drawable.ic_document, 56.dp, 27.dp)
             Spacer(Modifier.height(9.dp))
             Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 16.sp, textAlign = TextAlign.Center)
@@ -754,7 +761,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Annulla") }
-            Button(onClick = onSave, modifier = Modifier.weight(1f)) { Text("Salva documento") }
+            GradientButton(onClick = onSave, modifier = Modifier.weight(1f)) { Text("Salva documento") }
         }
     }
 }
@@ -803,11 +810,11 @@ internal fun documentDate(timestamp: String): String = runCatching {
         Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("Annulla", fontWeight = FontWeight.SemiBold) }
-            Button(onClick = {
+            GradientButton(onClick = {
                 val parsedYear = year.toIntOrNull(); val parsedKm = mileage.toIntOrNull()
-                if (name.isBlank() || make.isBlank() || plate.isBlank() || parsedYear == null || parsedYear !in 1900..LocalDate.now().year || parsedKm == null || parsedKm < 0) { error = "Controlla nome, marca, targa, anno e chilometri"; return@Button }
+                if (name.isBlank() || make.isBlank() || plate.isBlank() || parsedYear == null || parsedYear !in 1900..LocalDate.now().year || parsedKm == null || parsedKm < 0) { error = "Controlla nome, marca, targa, anno e chilometri"; return@GradientButton }
                 val fuel = if (fuelChoice == "Altro") customFuel.trim() else fuelChoice
-                if (fuelChoice == "Altro" && fuel.isBlank()) { error = "Specifica il carburante"; return@Button }
+                if (fuelChoice == "Altro" && fuel.isBlank()) { error = "Specifica il carburante"; return@GradientButton }
                 runCatching { val photo = photoUri?.let { repo.readUri(it, 15 * 1024 * 1024) } ?: existing?.photo
                     onSave((existing ?: Vehicle()).copy(name = name.trim(), make = make.trim(), model = model.trim(), year = parsedYear, plate = plate.trim(), mileage = parsedKm, registrationDate = registration, photo = photo, fuel = fuel, vehicleType = vehicleType, updatedAt = now()))
                 }.onFailure { error = it.message ?: "Foto non leggibile" }
@@ -1068,7 +1075,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
         Spacer(Modifier.height(2.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("Annulla", fontWeight = FontWeight.SemiBold) }
-            Button(onClick = {
+            GradientButton(onClick = {
                 val parsedDate = runCatching { LocalDate.parse(date) }.getOrNull()
                 val km = mileage.toIntOrNull()
                 val euro = cost.replace(',', '.').toDoubleOrNull()
@@ -1076,12 +1083,12 @@ internal fun documentDate(timestamp: String): String = runCatching {
                 val nextKm = threshold.toIntOrNull()
                 val intervalValue = interval.toIntOrNull()
                 if (parsedDate == null || km == null || km < 0 || euro == null || !euro.isFinite() || euro < 0 || (type == "custom" && customName.isBlank())) {
-                    error = "Controlla i dati dell'intervento"; return@Button
+                    error = "Controlla i dati dell'intervento"; return@GradientButton
                 }
                 if (reminderEnabled && ((reminderType in listOf("date", "both") && (due == null || due.isBefore(LocalDate.now()))) ||
                             (reminderType == "interval" && (intervalValue == null || intervalValue !in 1..24)) ||
                             (reminderType in listOf("mileage", "both") && (nextKm == null || nextKm <= maxOf(km, vehicle.mileage))))) {
-                    error = "Controlla data, intervallo o soglia del promemoria"; return@Button
+                    error = "Controlla data, intervallo o soglia del promemoria"; return@GradientButton
                 }
                 val m = (existing ?: Maintenance(vehicleId = vehicle.id)).copy(type = type, customName = if (type == "custom") customName.trim() else "", date = date, mileage = km, cost = euro, notes = notes.trim(), updatedAt = now())
                 val reminder = if (!reminderEnabled) null else (existingReminder ?: Reminder(maintenanceId = m.id)).copy(

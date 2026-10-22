@@ -91,10 +91,10 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 internal val Gold = Color(0xFFFFD84D)
-internal val Black = Color(0xFF0A0907)
-private val Panel = Color(0xFF171510)
-private val Cream = Color(0xFFFFF8E9)
-private val Muted = Color(0xFFB7A98E)
+internal val Black = Color(0xFF09080A)
+private val Panel = Color(0xFF16141A)
+internal val Cream = Color(0xFFFFF8E9)
+internal val Muted = Color(0xFFB7A98E)
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -241,20 +241,21 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
     val colors = if (isDark) darkColorScheme(
         primary = Gold, onPrimary = Black, background = Black, surface = Panel,
         surfaceContainerLowest = Black, surfaceContainerLow = Panel, surfaceContainer = Panel,
-        surfaceContainerHigh = Color(0xFF221F19), surfaceContainerHighest = Color(0xFF2C281F),
-        surfaceVariant = Color(0xFF29251D), onSurfaceVariant = Muted, outline = Color(0xFF6E6042),
+        surfaceContainerHigh = Color(0xFF221F25), surfaceContainerHighest = Color(0xFF2C2930),
+        surfaceVariant = Color(0xFF27242B), onSurfaceVariant = Muted, outline = Color(0xFF6E6252),
         onBackground = Cream, onSurface = Cream, secondary = Muted,
-        secondaryContainer = Color(0xFF403515), onSecondaryContainer = Cream
+        secondaryContainer = Color(0xFF3D3214), onSecondaryContainer = Gold, error = Color(0xFFFF6B6B)
     ) else lightColorScheme(
-        primary = Color(0xFF795600), onPrimary = Color.White, background = Color(0xFFF6F4EE), surface = Color.White,
+        primary = Color(0xFF8A5A00), onPrimary = Color.White, background = Color(0xFFF7F3EA), surface = Color.White,
         surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFFFFCF5),
         surfaceContainer = Color(0xFFF8F5ED), surfaceContainerHigh = Color(0xFFF0EBDF),
         surfaceContainerHighest = Color(0xFFE9E2D3), surfaceVariant = Color(0xFFE9E2D3),
         onSurfaceVariant = Color(0xFF665B46), outline = Color(0xFF85745A),
         onBackground = Black, onSurface = Black, secondary = Color(0xFF665B46),
-        secondaryContainer = Color(0xFFFFE9A8), onSecondaryContainer = Black
+        secondaryContainer = Color(0xFFFFE7A3), onSecondaryContainer = Color(0xFF3A2A00)
     )
-    MaterialTheme(colorScheme = colors, shapes = Shapes(medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(26.dp))) {
+    CompositionLocalProvider(LocalGarageDark provides isDark) {
+    MaterialTheme(colorScheme = colors, typography = garageTypography(), shapes = Shapes(small = RoundedCornerShape(14.dp), medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(28.dp), extraLarge = RoundedCornerShape(32.dp))) {
         if (locked) {
             GarageLockScreen(hasPin = hasPin, pinLength = repo.pinLength, biometric = biometric && (context as MainActivity).canUseBiometrics(), isDark = isDark,
                 verifyPin = repo::verifyPin, onUnlocked = { locked = false },
@@ -265,6 +266,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         } else {
             val showNavigation = !newVehicle && editVehicle == null && !newMaintenance && editMaintenance == null && !addDocument && editDocument == null && openMaintenanceId == null && openReminderId == null && openDocumentId == null
             Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
                 modifier = Modifier.fillMaxSize()
                     .onGloballyPositioned { scaffoldOrigin = it.positionInRoot() }
                     .pointerInput(Unit) {
@@ -295,8 +297,8 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                         targetState = destination,
                         modifier = Modifier.fillMaxSize(),
                         transitionSpec = {
-                            val hero = setOf(initialState.screen, targetState.screen) == setOf("garage", "detail")
-                            val buttonHero = setOf(initialState.screen, targetState.screen) == setOf("garage", "vehicle-editor")
+                            val pair = setOf(initialState.screen, targetState.screen)
+                            val buttonHero = pair == setOf("garage", "vehicle-editor") || pair == setOf("garage", "detail") || pair == setOf("detail", "sections")
                             val depth = mapOf("garage" to 0, "scadenze" to 0, "impostazioni" to 0, "detail" to 1, "sections" to 2,
                                 "maintenance-detail" to 3, "reminder-detail" to 3, "document-detail" to 3,
                                 "vehicle-editor" to 4, "maintenance-editor" to 4, "document-editor" to 4)
@@ -306,14 +308,14 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                                 ((lastTap.x - contentBounds.left) / contentBounds.width).coerceIn(0f, 1f),
                                 ((lastTap.y - contentBounds.top) / contentBounds.height).coerceIn(0f, 1f)
                             ) else TransformOrigin.Center
-                            if (!goingBack && !hero) openingOrigins[targetState] = tapOrigin
+                            if (!goingBack && !buttonHero) openingOrigins[targetState] = tapOrigin
                             val origin = if (goingBack) openingOrigins[initialState] ?: TransformOrigin.Center else tapOrigin
-                            val enter = if (buttonHero) fadeIn(tween(if (goingBack) 120 else 260)) else if (hero || goingBack) fadeIn(tween(180)) else scaleIn(
+                            val enter = if (buttonHero) fadeIn(tween(if (goingBack) 120 else 260)) else if (goingBack) fadeIn(tween(180)) else scaleIn(
                                 initialScale = if (recentTap && !goingBack) 0.12f else 0.94f,
                                 transformOrigin = origin,
                                 animationSpec = tween(340, easing = FastOutSlowInEasing)
                             ) + fadeIn(tween(110))
-                            val exit = if (buttonHero) fadeOut(tween(if (goingBack) 300 else 140)) else if (hero) fadeOut(tween(140)) else if (!goingBack) fadeOut(tween(150)) else scaleOut(
+                            val exit = if (buttonHero) fadeOut(tween(if (goingBack) 300 else 140)) else if (!goingBack) fadeOut(tween(150)) else scaleOut(
                                 targetScale = if (goingBack && openingOrigins.containsKey(initialState)) 0.12f else 0.96f,
                                 transformOrigin = origin,
                                 animationSpec = tween(if (goingBack) 300 else 230, easing = FastOutSlowInEasing)
@@ -323,12 +325,14 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                         label = "garage_navigation"
                     ) { shown ->
                         val selected = state.vehicles.firstOrNull { it.id == shown.vehicleId }
-                        val pageModifier = if (shown.screen == "vehicle-editor" && editVehicle == null) with(this@SharedTransitionLayout) {
-                            Modifier.sharedBounds(rememberSharedContentState("add-vehicle-page"), this@AnimatedContent,
-                                enter = fadeIn(tween(260)), exit = fadeOut(tween(300)),
-                                boundsTransform = BoundsTransform { _, _ -> tween(340, easing = FastOutSlowInEasing) })
-                        } else Modifier
-                        Box(Modifier.fillMaxSize().then(pageModifier).background(MaterialTheme.colorScheme.background)) {
+                        val containerKey = when {
+                            shown.screen == "vehicle-editor" && editVehicle == null -> "add-vehicle-page"
+                            shown.screen == "detail" && page == "garage" -> "vehicle-page-${shown.vehicleId}"
+                            shown.screen == "sections" -> "sections-page-${shown.vehicleId}"
+                            else -> null
+                        }
+                        val pageModifier = if (containerKey != null) Modifier.containerTransform(containerKey, this@SharedTransitionLayout, this@AnimatedContent) else Modifier
+                        Box(Modifier.fillMaxSize().then(pageModifier).garageBackdrop()) {
                         when (shown.screen) {
                         "vehicle-editor" -> VehicleEditor(editVehicle, photoUri, { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onDismiss = { newVehicle = false; editVehicle = null; photoUri = null }, onSave = { value ->
@@ -438,91 +442,6 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
             pinSetupEnablesProtection = false
         })
     }
-}
-
-@Composable private fun FloatingGarageNavigation(page: String, modifier: Modifier = Modifier, onSelect: (String) -> Unit) {
-    val destinations = listOf(Triple("garage", "Garage", R.drawable.ic_garage_nav), Triple("scadenze", "Scadenze", R.drawable.ic_calendar_nav), Triple("impostazioni", "Impostazioni", R.drawable.ic_settings_nav))
-    Box(modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 8.dp)) {
-        BoxWithConstraints(Modifier.fillMaxWidth().shadow(12.dp, RoundedCornerShape(30.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(30.dp)).padding(5.dp)) {
-            val segment = maxWidth / destinations.size
-            val selectedIndex = destinations.indexOfFirst { it.first == page }.coerceAtLeast(0)
-            val indicatorX by animateDpAsState(segment * selectedIndex, tween(340, easing = FastOutSlowInEasing), label = "bottom_navigation_pill")
-            Box(Modifier.offset(x = indicatorX).width(segment).height(58.dp).background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(25.dp)))
-            Row(Modifier.fillMaxWidth().selectableGroup()) {
-                destinations.forEach { (key, label, icon) ->
-                    val selected = key == page
-                    val interaction = remember { MutableInteractionSource() }
-                    Column(Modifier.weight(1f).height(58.dp).clip(RoundedCornerShape(25.dp)).selectable(selected = selected, interactionSource = interaction, indication = null, role = Role.Tab, onClick = { onSelect(key) }),
-                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                        Icon(painterResource(icon), contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(23.dp))
-                        Spacer(Modifier.height(2.dp))
-                        Text(label, color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable private fun GarageLockScreen(hasPin: Boolean, pinLength: Int, biometric: Boolean, isDark: Boolean,
-    verifyPin: (String) -> Boolean, onUnlocked: () -> Unit, onBiometric: () -> Unit, onLegacyUnlock: () -> Unit) {
-    var pin by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    var failures by remember { mutableIntStateOf(0) }
-    var blockedUntil by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(biometric, hasPin) { if (biometric && hasPin) onBiometric() }
-    fun digit(value: Int) {
-        if (SystemClock.elapsedRealtime() < blockedUntil) { error = "Riprova tra qualche secondo"; return }
-        if (pin.length >= 8) return
-        val candidate = pin + value
-        pin = candidate; error = ""
-        val shouldCheck = if (pinLength in 4..8) candidate.length == pinLength else candidate.length >= 4
-        if (shouldCheck && verifyPin(candidate)) { pin = ""; failures = 0; onUnlocked(); return }
-        if ((pinLength in 4..8 && candidate.length == pinLength) || candidate.length == 8) {
-            pin = ""; failures++
-            if (failures >= 5) { blockedUntil = SystemClock.elapsedRealtime() + 30_000; failures = 0; error = "Troppi tentativi. Riprova tra 30 secondi" }
-            else error = "PIN non corretto"
-        }
-    }
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding().padding(horizontal = 26.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Image(painterResource(if (isDark) R.drawable.garage_logo_dark else R.drawable.garage_logo_light), contentDescription = "Garage", modifier = Modifier.size(74.dp))
-        Spacer(Modifier.height(20.dp))
-        Text("Garage protetto", color = MaterialTheme.colorScheme.onBackground, fontSize = 31.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(5.dp))
-        Text(if (hasPin) "Inserisci il tuo PIN" else "Usa il blocco schermo del dispositivo", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(25.dp))
-        if (hasPin) {
-            Row(horizontalArrangement = Arrangement.spacedBy(11.dp), verticalAlignment = Alignment.CenterVertically) {
-                repeat((pinLength.takeIf { it in 4..8 } ?: 6)) { index ->
-                    Box(Modifier.size(12.dp).background(if (index < pin.length) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .45f), CircleShape))
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, minLines = 1)
-            Spacer(Modifier.height(20.dp))
-            listOf(listOf(1, 2, 3), listOf(4, 5, 6), listOf(7, 8, 9)).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    row.forEach { number -> PinKey(number.toString()) { digit(number) } }
-                }
-                Spacer(Modifier.height(10.dp))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
-                    if (biometric) TextButton(onClick = onBiometric) { Text("Bio", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp) }
-                }
-                PinKey("0") { digit(0) }
-                PinKey("⌫") { if (pin.isNotEmpty()) { pin = pin.dropLast(1); error = "" } }
-            }
-        } else Button(onClick = onLegacyUnlock, modifier = Modifier.fillMaxWidth()) { Text("Sblocca") }
-    }
-}
-
-@Composable private fun PinKey(label: String, onClick: () -> Unit) {
-    Box(Modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface)
-        .clickable(onClickLabel = if (label == "⌫") "Cancella cifra" else "Cifra $label", onClick = onClick), contentAlignment = Alignment.Center) {
-        Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 27.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -569,124 +488,6 @@ private fun shareDocument(context: Context, doc: GarageDocument) {
     }.onFailure { Toast.makeText(context, "Condivisione non disponibile", Toast.LENGTH_LONG).show() }
 }
 
-@Composable private fun Onboarding(done: () -> Unit) {
-    val slides = listOf(
-        "Il tuo garage,\nsempre con te." to "Auto, manutenzioni, documenti e scadenze in un unico spazio privato.",
-        "Ogni auto ha\nla sua storia." to "Conserva targa, chilometri, foto e appunti nella scheda del veicolo.",
-        "Interventi sotto\ncontrollo." to "Registra tagliandi, revisione, bollo, assicurazione e altri lavori.",
-        "Documenti e\nscadenze." to "Archivia i file sul dispositivo e consulta i promemoria quando vuoi.",
-        "Pronto a partire." to "I dati restano disponibili offline. Esporta un backup per portarli con te."
-    )
-    var step by remember { mutableIntStateOf(0) }
-    Column(Modifier.fillMaxSize().background(Black).statusBarsPadding().navigationBarsPadding().padding(28.dp), verticalArrangement = Arrangement.Center) {
-        Image(painterResource(R.drawable.garage_logo_dark), contentDescription = "Garage", modifier = Modifier.size(100.dp))
-        Spacer(Modifier.height(30.dp)); Text("0${step + 1} / 05", color = Gold, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(15.dp)); Text(slides[step].first, color = Cream, fontSize = 38.sp, fontWeight = FontWeight.Black, lineHeight = 40.sp)
-        Spacer(Modifier.height(22.dp)); Text(slides[step].second, color = Muted)
-        Spacer(Modifier.height(36.dp)); Button(onClick = { if (step == slides.lastIndex) done() else step++ }, colors = ButtonDefaults.buttonColors(containerColor = Gold, contentColor = Black), modifier = Modifier.fillMaxWidth()) { Text(if (step == slides.lastIndex) "Inizia subito" else "Continua") }
-        TextButton(onClick = done, modifier = Modifier.fillMaxWidth()) { Text("Salta", color = Cream) }
-    }
-}
-
-@Composable internal fun SectionHeading(kicker: String, title: String, subtitle: String = "") { Column(Modifier.padding(bottom = 20.dp)) {
-    Text(kicker.uppercase(), color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-    Text(title, fontSize = 32.sp, lineHeight = 34.sp, fontWeight = FontWeight.Black)
-    if (subtitle.isNotBlank()) Text(subtitle, color = MaterialTheme.colorScheme.secondary)
-} }
-@Composable internal fun InfoCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) { Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(24.dp)) { Column(Modifier.padding(18.dp), content = content) } }
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable private fun GarageHome(state: GarageState, add: () -> Unit, open: (String) -> Unit, sharedTransitionScope: SharedTransitionScope, animatedVisibilityScope: AnimatedVisibilityScope) {
-    var archive by remember { mutableStateOf(false) }; var query by remember { mutableStateOf("") }
-    val active = state.vehicles.filter { it.status == "active" }; val archived = state.vehicles.filter { it.status != "active" && "${it.name} ${it.make} ${it.plate}".contains(query, true) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { SectionHeading("Garage", "Le tue auto", "Un posto per ogni dettaglio della tua strada.") }
-        item { val launchModifier = with(sharedTransitionScope) {
-            Modifier.sharedBounds(rememberSharedContentState("add-vehicle-page"), animatedVisibilityScope,
-                enter = fadeIn(tween(260)), exit = fadeOut(tween(300)),
-                boundsTransform = BoundsTransform { _, _ -> tween(340, easing = FastOutSlowInEasing) })
-        }
-        Button(onClick = add, modifier = Modifier.fillMaxWidth().height(56.dp).then(launchModifier), shape = RoundedCornerShape(30.dp)) {
-            Text("＋", fontSize = 27.sp, lineHeight = 27.sp, fontWeight = FontWeight.Light)
-            Spacer(Modifier.width(9.dp))
-            Text("Aggiungi auto", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        } }
-        if (active.isEmpty()) item { InfoCard(Modifier.fillMaxWidth()) {
-            Text(if (state.vehicles.isEmpty()) "Il garage è pronto." else "Nessuna auto attiva", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text(if (state.vehicles.isEmpty()) "Aggiungi la tua prima auto per iniziare." else "Aggiungi un'auto o consulta l'archivio.", color = MaterialTheme.colorScheme.secondary)
-        } }
-        items(active, key = { it.id }) { VehicleCard(it, open, sharedTransitionScope, animatedVisibilityScope) }
-        if (state.vehicles.any { it.status != "active" }) {
-            item { TextButton(onClick = { archive = !archive }) { Text(if (archive) "Nascondi archivio" else "Mostra archivio (${state.vehicles.size - active.size})") } }
-            if (archive) { item { OutlinedTextField(query, { query = it }, label = { Text("Cerca nell'archivio") }, modifier = Modifier.fillMaxWidth()) }; items(archived, key = { it.id }) { VehicleCard(it, open, sharedTransitionScope, animatedVisibilityScope) } }
-        }
-    }
-}
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable private fun VehicleCard(v: Vehicle, open: (String) -> Unit, sharedTransitionScope: SharedTransitionScope, animatedVisibilityScope: AnimatedVisibilityScope) {
-    val statusLabel = when (v.status) { "sold" -> "Venduta"; "scrapped" -> "Rottamata"; else -> "Attiva" }
-    val accent = MaterialTheme.colorScheme.primary
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    Card(Modifier.fillMaxWidth().clickable { open(v.id) }, shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)) {
-        Column(Modifier.padding(8.dp)) {
-            if (v.photo != null) {
-                Box(Modifier.fillMaxWidth().height(166.dp).clip(RoundedCornerShape(19.dp))) {
-                    val photoModifier = with(sharedTransitionScope) { Modifier.sharedElement(rememberSharedContentState("photo-${v.id}"), animatedVisibilityScope, boundsTransform = BoundsTransform { _, _ -> tween(300, easing = FastOutSlowInEasing) }).fillMaxSize() }
-                    VehicleImage(v.photo, photoModifier)
-                    val chipModifier = with(sharedTransitionScope) { with(animatedVisibilityScope) {
-                        Modifier.renderInSharedTransitionScopeOverlay(zIndexInOverlay = 1f)
-                            .animateEnterExit(enter = fadeIn(tween(150)), exit = fadeOut(tween(140)))
-                    } }
-                    Row(Modifier.align(Alignment.BottomStart).padding(9.dp).then(chipModifier).background(Color.Black.copy(alpha = .76f), RoundedCornerShape(50)).padding(horizontal = 11.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(8.dp).background(if (v.status == "active") Color(0xFF2AD06D) else Color(0xFFB4B1AA), CircleShape))
-                        Spacer(Modifier.width(6.dp))
-                        Text(statusLabel, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-            Column(Modifier.padding(horizontal = 10.dp, vertical = 11.dp)) {
-                if (v.photo == null) {
-                    Text(statusLabel.uppercase(Locale.ITALY), color = accent, fontSize = 11.sp, letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(7.dp))
-                }
-                Text(v.plate.uppercase(Locale.ITALY), color = accent, fontSize = 12.sp, letterSpacing = 2.5.sp, fontWeight = FontWeight.Black)
-                Spacer(Modifier.height(3.dp))
-                val titleModifier = with(sharedTransitionScope) { Modifier.sharedBounds(rememberSharedContentState("title-${v.id}"), animatedVisibilityScope, enter = fadeIn(tween(180)), exit = fadeOut(tween(140)), boundsTransform = BoundsTransform { _, _ -> tween(300, easing = FastOutSlowInEasing) }) }
-                Text(v.name, modifier = titleModifier, fontSize = 27.sp, lineHeight = 30.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("${v.make} ${v.model} · ${v.year}", color = muted, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(13.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(painterResource(R.drawable.ic_speedometer), contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(v.mileage.formatKm(), color = muted, fontSize = 14.sp)
-                    if (v.fuel.isNotBlank()) {
-                        Spacer(Modifier.width(14.dp))
-                        VerticalDivider(Modifier.height(18.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = .3f))
-                        Spacer(Modifier.width(14.dp))
-                        Icon(painterResource(R.drawable.ic_fuel), contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(v.fuel, color = muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                Spacer(Modifier.height(5.dp))
-            }
-        }
-    }
-}
-@Composable internal fun VehicleImage(data: ByteArray?, modifier: Modifier = Modifier) { val bitmap = remember(data) { data?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() } }
-    if (bitmap != null) Box(modifier.clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-        Image(BitmapPainter(bitmap), contentDescription = "Foto auto", modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-    }
-}
-@Composable private fun ReminderScreen(state: GarageState, open: (String) -> Unit) { val list = dueReminders(state); LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    item { SectionHeading("Agenda", "Scadenze", "Promemoria delle auto attive") }
-    if (list.isEmpty()) item { InfoCard(Modifier.fillMaxWidth()) { Text("Nessuna scadenza da mostrare.") } }
-    items(list) { item -> InfoCard(Modifier.fillMaxWidth().clickable { open(item.vehicle.id) }) {
-        Text(item.vehicle.name, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        Text(maintenanceLabel(item.maintenance), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text(when { item.days == null -> "Data da verificare"; item.days < 0 -> "Scaduto"; item.days == 0L -> "Oggi"; else -> "Tra ${item.days} giorni" }, color = if ((item.days ?: 999) < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary)
-        if (item.kmLeft != null) Text("${item.kmLeft} km alla soglia")
-    } }
-} }
 internal fun Int.formatKm() = String.format(Locale.ITALY, "%,d km", this)
 internal fun maintenanceLabel(m: Maintenance) = if (m.type == "custom") m.customName else mapOf("service" to "Tagliando", "inspection" to "Revisione", "tax" to "Bollo", "insurance" to "Assicurazione", "tires" to "Cambio gomme")[m.type] ?: m.type
 internal fun dateLabel(value: String): String = runCatching { LocalDate.parse(value).format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ITALY)) }.getOrDefault(value.ifBlank { "—" })

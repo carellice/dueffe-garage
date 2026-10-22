@@ -23,11 +23,11 @@ I dati sono conservati sul dispositivo. La protezione all'apertura non cifra il 
 
 ## Avvio con doppio clic
 
-Apri [`Avvia Garage su Pixel.command`](Avvia%20Garage%20su%20Pixel.command). Lo script compila l'APK debug, avvia il primo emulatore Pixel configurato in Android Studio se necessario, installa e apre l'app. Per scegliere un altro emulatore: `GARAGE_AVD=Nome_AVD` nell'ambiente dello script.
+Apri [`Avvia Garage su Pixel.command`](Avvia%20Garage%20su%20Pixel.command). Lo script compila l'APK debug, avvia il primo emulatore Pixel configurato in Android Studio se necessario, installa e apre l'app. Per scegliere un altro emulatore: `GARAGE_AVD=Nome_AVD` nell'ambiente dello script. Su Windows usa [`Avvia Garage su Pixel.bat`](Avvia%20Garage%20su%20Pixel.bat).
 
 ## Release GitHub con doppio clic
 
-Apri [`Pubblica Garage APK.command`](Pubblica%20Garage%20APK.command). Servono Android Studio, SDK, `gh` autenticato e accesso in scrittura alla repository pubblica `android-app-releases` dell'account GitHub attivo. Per usare un'altra repository pubblica, imposta `GARAGE_RELEASE_REPO=proprietario/android-app-releases`.
+Apri [`Pubblica Garage APK.command`](Pubblica%20Garage%20APK.command) su macOS oppure [`Pubblica Garage APK.bat`](Pubblica%20Garage%20APK.bat) su Windows. I due script condividono `.release-secrets/`. Servono Android Studio, SDK, `gh` autenticato e accesso in scrittura alla repository pubblica `android-app-releases` dell'account GitHub attivo. Per usare un'altra repository pubblica, imposta `GARAGE_RELEASE_REPO=proprietario/android-app-releases`.
 
 Lo script:
 

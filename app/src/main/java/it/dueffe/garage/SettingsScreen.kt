@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -27,22 +28,23 @@ import androidx.compose.ui.unit.sp
 ) {
     var clearConfirm by remember { mutableStateOf(false) }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    LazyColumn(contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 112.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+    val onAccent = if (LocalGarageDark.current) Black else Color.White
+    LazyColumn(contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 120.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
         item { SectionHeading("Garage", "Impostazioni", "Il tuo spazio, come piace a te.") }
         item {
-            SettingsPanel(R.drawable.ic_settings_nav, "Aspetto", "Scegli come vedere il tuo garage") {
+            SettingsPanel(R.drawable.ic_settings_nav, "Aspetto", "Scegli come vedere il tuo garage", index = 1) {
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
                     .padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     listOf(Triple("system", "Sistema", R.drawable.ic_settings_nav), Triple("light", "Chiaro", R.drawable.ic_calendar_nav), Triple("dark", "Scuro", R.drawable.ic_garage_nav)).forEach { (key, label, icon) ->
                         val selected = theme == key
                         Row(Modifier.weight(1f).clip(RoundedCornerShape(17.dp))
-                            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                            .clickable { changeTheme(key) }.padding(vertical = 12.dp),
+                            .background(if (selected) accentGradient() else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)))
+                            .bouncyClick { changeTheme(key) }.padding(vertical = 12.dp),
                             horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                             Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(16.dp),
-                                tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else muted)
+                                tint = if (selected) onAccent else muted)
                             Spacer(Modifier.width(5.dp))
-                            Text(label, color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else muted,
+                            Text(label, color = if (selected) onAccent else muted,
                                 fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                         }
                     }
@@ -50,7 +52,7 @@ import androidx.compose.ui.unit.sp
             }
         }
         item {
-            SettingsPanel(R.drawable.ic_calendar_nav, "Scadenze", "Promemoria per arrivare sempre in tempo") {
+            SettingsPanel(R.drawable.ic_calendar_nav, "Scadenze", "Promemoria per arrivare sempre in tempo", index = 2) {
                 SettingsSwitchRow("Notifiche", "Avvisami delle prossime scadenze", notifications, onNotifications)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .18f))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -63,7 +65,7 @@ import androidx.compose.ui.unit.sp
             }
         }
         item {
-            SettingsPanel(R.drawable.ic_shield, "Privacy e accesso", "I tuoi dati restano nelle tue mani") {
+            SettingsPanel(R.drawable.ic_shield, "Privacy e accesso", "I tuoi dati restano nelle tue mani", index = 3) {
                 SettingsSwitchRow("Proteggi Garage", "Richiedi il PIN all'apertura", protection, onProtection)
                 if (protection) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .18f))
@@ -76,16 +78,16 @@ import androidx.compose.ui.unit.sp
             }
         }
         item {
-            SettingsPanel(R.drawable.ic_folder, "I tuoi dati", "Esporta o ripristina il tuo archivio") {
+            SettingsPanel(R.drawable.ic_folder, "I tuoi dati", "Esporta o ripristina il tuo archivio", index = 4) {
                 val backupStatus = if (lastExport.isBlank()) "Nessun backup esportato" else if (lastChange > lastExport) "Un nuovo backup è consigliato" else "Backup aggiornato"
                 Text(backupStatus, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                Button(onClick = onExport, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(24.dp)) { Text("Esporta backup", fontWeight = FontWeight.Bold) }
+                GradientButton(onClick = onExport, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(24.dp)) { Text("Esporta backup", fontWeight = FontWeight.Bold) }
                 OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(24.dp)) { Text("Importa backup") }
                 Text("Il file include foto e documenti e non è cifrato.", color = muted, fontSize = 12.sp)
             }
         }
         item {
-            SettingsPanel(R.drawable.ic_note, "Garage", "L'archivio è disponibile anche offline") {
+            SettingsPanel(R.drawable.ic_note, "Garage", "L'archivio è disponibile anche offline", index = 5) {
                 SettingsAction("Rivedi l'introduzione", R.drawable.ic_chevron_right, onOnboarding)
             }
         }
@@ -101,14 +103,11 @@ import androidx.compose.ui.unit.sp
     if (clearConfirm) ConfirmDelete("Eliminare definitivamente auto, interventi e documenti?", { clearConfirm = false }, { onClear(); clearConfirm = false })
 }
 
-@Composable private fun SettingsPanel(icon: Int, title: String, subtitle: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(25.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+@Composable private fun SettingsPanel(icon: Int, title: String, subtitle: String, index: Int = 0, content: @Composable ColumnScope.() -> Unit) {
+    GlassCard(Modifier.fillMaxWidth().staggerIn(index), padding = 0.dp) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(48.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                }
+                GradientIcon(icon, 46.dp, 22.dp)
                 Column {
                     Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
@@ -131,7 +130,7 @@ import androidx.compose.ui.unit.sp
 }
 
 @Composable private fun SettingsAction(label: String, icon: Int, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).clickable(onClick = onClick).padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).bouncyClick(onClick = onClick).padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(10.dp))
         Text(label, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
