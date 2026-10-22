@@ -81,8 +81,10 @@ gh release create "%TAG%" "%ASSET%#Garage-%NEW_NAME%.apk" "%ASSET_DIR%\latest.js
 set "PUBLISHED=1"
 
 echo Rimuovo le vecchie release di Garage...
-gh api --paginate "repos/%REPO%/releases?per_page=100" --jq ".[].tag_name" > "%TEMP%\garage-tags.txt" || (call :fail "Release pubblicata, ma elenco delle vecchie versioni non disponibile" & exit /b 1)
-for /f "usebackq delims=" %%t in (`findstr /r "^garage-v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$ ^dueffe-garage-v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$" "%TEMP%\garage-tags.txt"`) do (
+gh api --paginate "repos/%REPO%/releases?per_page=100" --jq ".[].tag_name" > "%TEMP%\garage-tags-lf.txt" || (call :fail "Release pubblicata, ma elenco delle vecchie versioni non disponibile" & exit /b 1)
+rem gh scrive righe con solo LF: "more" le converte in CRLF, come si aspetta findstr.
+more < "%TEMP%\garage-tags-lf.txt" > "%TEMP%\garage-tags.txt"
+for /f "usebackq delims=" %%t in (`findstr /r /x "garage-v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]* dueffe-garage-v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*" "%TEMP%\garage-tags.txt"`) do (
   if not "%%t"=="%TAG%" (
     gh release delete "%%t" --repo "%REPO%" --cleanup-tag --yes || (call :fail "Release %TAG% pubblicata, ma eliminazione di %%t non riuscita" & exit /b 1)
   )
