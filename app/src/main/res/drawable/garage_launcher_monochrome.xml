@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/ic_garage_nav"
-    android:insetLeft="30dp"
-    android:insetTop="30dp"
-    android:insetRight="30dp"
-    android:insetBottom="30dp" />
+<!-- Themed-icon silhouette of the logo: garage with the car cut out of the opening. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.7" android:scaleY="0.7" android:pivotX="54" android:pivotY="56">
+        <path android:fillColor="#FF000000" android:fillType="evenOdd" android:strokeColor="#FF000000"
+            android:strokeWidth="6" android:strokeLineJoin="round"
+            android:pathData="M54,28 L80,46 L80,82 L28,82 L28,46 Z M35,82 L35,56 Q35,50 41,50 L67,50 Q73,50 73,56 L73,82 Z" />
+        <path android:fillColor="#FF000000" android:pathData="M40.7,53.5 H67.3 A1.7,1.7 0 0 1 67.3,56.9 H40.7 A1.7,1.7 0 0 1 40.7,53.5 Z M40.7,58.6 H67.3 A1.7,1.7 0 0 1 67.3,62 H40.7 A1.7,1.7 0 0 1 40.7,58.6 Z" />
+        <path android:fillColor="#FF000000" android:fillType="evenOdd"
+            android:pathData="M39,79 L39,71 Q39,66.6 43.4,66.6 L44.2,66.6 L47.4,61.4 Q48.3,63 50,63 L58,63 Q59.7,63 60.6,61.4 L63.8,66.6 L64.6,66.6 Q69,66.6 69,71 L69,79 Q69,80.4 67.6,80.4 L40.4,80.4 Q39,80.4 39,79 Z M42.6,70.8 L46,71.2 Q47,71.4 46.8,72.4 Q46.6,73.2 45.8,73.2 L42.8,73.2 Q41.8,73.2 41.8,72.2 Z M65.4,70.8 L62,71.2 Q61,71.4 61.2,72.4 Q61.4,73.2 62.2,73.2 L65.2,73.2 Q66.2,73.2 66.2,72.2 Z" />
+    </group>
+</vector>
