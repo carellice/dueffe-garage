@@ -53,12 +53,12 @@ ask_yes() { # ask_yes "domanda" s|n
 printf "${V}${B}"
 cat <<'EOF'
 
-   __  __
-  |  \/  | ___  _ __   ___ _   _
-  | |\/| |/ _ \| '_ \ / _ \ | | |
-  | |  | | (_) | | | |  __/ |_| |
-  |_|  |_|\___/|_| |_|\___|\__, |
-                           |___/   PWA per CasaOS
+    ____
+   / ___| __ _ _ __ __ _  __ _  ___
+  | |  _ / _` | '__/ _` |/ _` |/ _ \
+  | |_| | (_| | | | (_| | (_| |  __/
+   \____|\__,_|_|  \__,_|\__, |\___|
+                         |___/   PWA per CasaOS
 EOF
 printf "${R}\n"
 info "Ti guido passo passo. Premi Invio per accettare il valore tra parentesi."
@@ -307,8 +307,8 @@ x-casaos:
     en_us: Cars, maintenance, deadlines and documents
     it_it: Auto, interventi, scadenze e documenti
   description:
-    en_us: Dueffe Garage: vehicle cards with photos, maintenance with costs and reminders, documents and deadline notifications. Every account has its own private garage.
-    it_it: Garage della famiglia Dueffe: schede auto con foto, interventi con costi e promemoria, documenti e notifiche delle scadenze. Ogni account ha il proprio garage privato.
+    en_us: "Dueffe Garage: vehicle cards with photos, maintenance with costs and reminders, documents and deadline notifications. Every account has its own private garage."
+    it_it: "Garage della famiglia Dueffe: schede auto con foto, interventi con costi e promemoria, documenti e notifiche delle scadenze. Ogni account ha il proprio garage privato."
   port_map: "$PORT"
   scheme: http
   index: /
