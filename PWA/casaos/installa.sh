@@ -289,8 +289,8 @@ $https_ports
       volumes:
         - container: /data
           description:
-            en_us: Database with photos and documents
-            it_it: Database con foto e documenti
+            en_us: Database and receipts
+            it_it: Database e scontrini
 x-casaos:
   architectures:
     - amd64
