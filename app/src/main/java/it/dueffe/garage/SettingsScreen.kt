@@ -24,7 +24,8 @@ import androidx.compose.ui.unit.sp
     notifications: Boolean, onNotifications: (Boolean) -> Unit, leadDays: Int, onLeadDays: (Int) -> Unit,
     protection: Boolean, onProtection: (Boolean) -> Unit, hasPin: Boolean, onChangePin: () -> Unit,
     biometric: Boolean, biometricAvailable: Boolean, onBiometric: (Boolean) -> Unit, onLock: () -> Unit,
-    onExport: () -> Unit, onImport: () -> Unit, onOnboarding: () -> Unit, onClear: () -> Unit
+    onExport: () -> Unit, onImport: () -> Unit, onOnboarding: () -> Unit, onClear: () -> Unit,
+    serverActive: Boolean = false, onServer: () -> Unit = {}
 ) {
     var clearConfirm by remember { mutableStateOf(false) }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -87,7 +88,12 @@ import androidx.compose.ui.unit.sp
             }
         }
         item {
-            SettingsPanel(R.drawable.ic_note, "Garage", "L'archivio è disponibile anche offline", index = 5) {
+            SettingsPanel(R.drawable.ic_layers, "Server Garage", if (serverActive) "Attivo: i dati sono sul tuo server CasaOS" else "Spento: i dati restano solo sul telefono", index = 5) {
+                SettingsAction(if (serverActive) "Gestisci il collegamento" else "Usa il server Garage", R.drawable.ic_layers, onServer)
+            }
+        }
+        item {
+            SettingsPanel(R.drawable.ic_note, "Garage", "L'archivio è disponibile anche offline", index = 6) {
                 SettingsAction("Rivedi l'introduzione", R.drawable.ic_chevron_right, onOnboarding)
             }
         }

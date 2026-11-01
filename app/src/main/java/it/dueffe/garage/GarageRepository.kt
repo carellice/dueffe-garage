@@ -6,6 +6,9 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
 import android.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -203,6 +206,56 @@ class GarageRepository(private val context: Context) : SQLiteOpenHelper(context,
         } finally { writableDatabase.endTransaction() }
         changed()
     }
+    // --- server mode: the Garage server on CasaOS keeps the data, this database is its copy ---------
+
+    val serverStore = ServerStore(context)
+    val sync = ServerSync(this, serverStore)
+    /** Messages of writes that did not reach the server; the activity shows them. */
+    val errors = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val serverMode: Boolean get() = serverStore.config.value != null
+
+    /** Replaces the local copy with the server data (ServerSync.pull). */
+    fun replaceAll(state: GarageState) {
+        writableDatabase.beginTransaction()
+        try {
+            writableDatabase.delete("item", null, null)
+            state.vehicles.forEach { put(writableDatabase, "vehicle", it.id, null, vehicleJson(it), it.photo) }
+            state.maintenances.forEach { put(writableDatabase, "maintenance", it.id, it.vehicleId, maintenanceJson(it)) }
+            state.reminders.forEach { put(writableDatabase, "reminder", it.id, it.maintenanceId, reminderJson(it)) }
+            state.documents.forEach { put(writableDatabase, "document", it.id, it.vehicleId, documentJson(it), it.data) }
+            writableDatabase.setTransactionSuccessful()
+        } finally { writableDatabase.endTransaction() }
+        changed()
+    }
+
+    /** Local mode runs the phone code as before; server mode sends the change. False when it failed (the form stays open). */
+    private suspend fun either(local: () -> Unit, remote: suspend (ServerConfig) -> Unit): Boolean = withContext(Dispatchers.IO) {
+        val config = serverStore.config.value
+        if (config == null) { local(); true }
+        else try { remote(config); true } catch (e: Exception) { errors.tryEmit(e.message ?: "Server non raggiungibile"); false }
+    }
+
+    suspend fun saveAsync(vehicle: Vehicle) = either({ save(vehicle) }) { sync.saveVehicle(it, vehicle) }
+    suspend fun saveAsync(maintenance: Maintenance, reminder: Reminder?) = either({ save(maintenance, reminder) }) { sync.saveMaintenance(it, maintenance, reminder) }
+    suspend fun saveAsync(document: GarageDocument) = either({ save(document) }) { sync.saveDocument(it, document) }
+    suspend fun deleteVehicleAsync(id: String) = either({ deleteVehicle(id) }) { sync.delete(it, "vehicles", id) }
+    suspend fun deleteMaintenanceAsync(id: String) = either({ deleteMaintenance(id) }) { sync.delete(it, "maintenances", id) }
+    suspend fun deleteReminderAsync(id: String) = either({ deleteReminder(id) }) { sync.delete(it, "reminders", id) }
+    suspend fun deleteDocumentAsync(id: String) = either({ deleteDocument(id) }) { sync.delete(it, "documents", id) }
+    suspend fun clearAsync() = either({ clear() }) { sync.clear(it) }
+
+    /** Throws with the reason when the backup is refused, in both modes. */
+    suspend fun importBackupAsync(bytes: ByteArray) = withContext(Dispatchers.IO) {
+        val config = serverStore.config.value
+        if (config == null) importBackup(bytes) else sync.importBackup(config, bytes)
+    }
+
+    /** Reloads the copy from the server; true when the data changed. Does nothing on the phone only. */
+    suspend fun refreshFromServer(force: Boolean = false): Boolean = withContext(Dispatchers.IO) {
+        val config = serverStore.config.value ?: return@withContext false
+        try { sync.pull(config, force) } catch (e: Exception) { false }
+    }
+
     fun readUri(uri: Uri, maxBytes: Int = 10 * 1024 * 1024): ByteArray {
         val stream = context.contentResolver.openInputStream(uri) ?: error("File non leggibile")
         return stream.use { input ->
@@ -213,16 +266,16 @@ class GarageRepository(private val context: Context) : SQLiteOpenHelper(context,
     }
 }
 
-private fun dataUrl(mime: String, bytes: ByteArray) = "data:$mime;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-private fun decodeDataUrl(value: String): ByteArray { require(value.startsWith("data:") && value.contains(",")) { "File nel backup non valido" }; return Base64.decode(value.substringAfter(','), Base64.DEFAULT) }
-private fun vehicleJson(v: Vehicle) = JSONObject().put("id", v.id).put("name", v.name).put("make", v.make).put("model", v.model).put("year", v.year).put("plate", v.plate).put("mileage", v.mileage).put("registrationDate", v.registrationDate).put("fuel", v.fuel).put("vehicleType", v.vehicleType).put("notes", v.notes).put("notesUpdatedAt", v.notesUpdatedAt).put("status", v.status).put("statusDate", v.statusDate).put("statusNote", v.statusNote).put("addedAt", v.addedAt).put("createdAt", v.createdAt).put("updatedAt", v.updatedAt)
-private fun maintenanceJson(m: Maintenance) = JSONObject().put("id", m.id).put("vehicleId", m.vehicleId).put("type", m.type).put("customName", m.customName).put("date", m.date).put("mileage", m.mileage).put("cost", m.cost).put("notes", m.notes).put("createdAt", m.createdAt).put("updatedAt", m.updatedAt)
-private fun reminderJson(r: Reminder) = JSONObject().put("id", r.id).put("maintenanceId", r.maintenanceId).put("type", r.type).put("dueDate", r.dueDate).put("mileageThreshold", r.mileageThreshold).put("intervalValue", r.intervalValue).put("intervalUnit", r.intervalUnit).put("active", r.active).put("createdAt", r.createdAt).put("updatedAt", r.updatedAt)
-private fun documentJson(d: GarageDocument) = JSONObject().put("id", d.id).put("vehicleId", d.vehicleId).put("name", d.name).put("mimeType", d.mimeType).put("category", d.category).put("size", d.size).put("addedAt", d.addedAt).put("updatedAt", d.updatedAt).put("maintenanceId", d.maintenanceId ?: JSONObject.NULL)
-private fun vehicleFrom(j: JSONObject, photo: ByteArray?) = Vehicle(j.string("id"), j.string("name"), j.string("make"), j.string("model"), j.optInt("year"), j.string("plate"), j.optInt("mileage"), j.string("registrationDate"), photo, j.string("notes"), j.string("notesUpdatedAt"), j.optString("status", "active"), j.string("statusDate"), j.string("statusNote"), j.string("addedAt"), j.string("createdAt"), j.string("updatedAt"), j.string("fuel"), j.optString("vehicleType", "car").ifBlank { "car" })
-private fun maintenanceFrom(j: JSONObject) = Maintenance(j.string("id"), j.string("vehicleId"), j.string("type"), j.string("customName"), j.string("date"), j.optInt("mileage"), j.optDouble("cost"), j.string("notes"), j.string("createdAt"), j.string("updatedAt"))
-private fun reminderFrom(j: JSONObject) = Reminder(j.string("id"), j.string("maintenanceId"), j.string("type"), j.string("dueDate"), j.nullableInt("mileageThreshold"), j.nullableInt("intervalValue"), j.string("intervalUnit"), j.optBoolean("active", true), j.string("createdAt"), j.string("updatedAt"))
-private fun documentFrom(j: JSONObject, bytes: ByteArray) = GarageDocument(j.string("id"), j.string("vehicleId"), j.string("name"), j.string("mimeType"), j.string("category"), j.optInt("size", bytes.size), bytes, j.string("addedAt"), j.string("updatedAt"), j.optString("maintenanceId").takeIf { it.isNotBlank() && it != "null" })
+internal fun dataUrl(mime: String, bytes: ByteArray) = "data:$mime;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+internal fun decodeDataUrl(value: String): ByteArray { require(value.startsWith("data:") && value.contains(",")) { "File nel backup non valido" }; return Base64.decode(value.substringAfter(','), Base64.DEFAULT) }
+internal fun vehicleJson(v: Vehicle) = JSONObject().put("id", v.id).put("name", v.name).put("make", v.make).put("model", v.model).put("year", v.year).put("plate", v.plate).put("mileage", v.mileage).put("registrationDate", v.registrationDate).put("fuel", v.fuel).put("vehicleType", v.vehicleType).put("notes", v.notes).put("notesUpdatedAt", v.notesUpdatedAt).put("status", v.status).put("statusDate", v.statusDate).put("statusNote", v.statusNote).put("addedAt", v.addedAt).put("createdAt", v.createdAt).put("updatedAt", v.updatedAt)
+internal fun maintenanceJson(m: Maintenance) = JSONObject().put("id", m.id).put("vehicleId", m.vehicleId).put("type", m.type).put("customName", m.customName).put("date", m.date).put("mileage", m.mileage).put("cost", m.cost).put("notes", m.notes).put("createdAt", m.createdAt).put("updatedAt", m.updatedAt)
+internal fun reminderJson(r: Reminder) = JSONObject().put("id", r.id).put("maintenanceId", r.maintenanceId).put("type", r.type).put("dueDate", r.dueDate).put("mileageThreshold", r.mileageThreshold).put("intervalValue", r.intervalValue).put("intervalUnit", r.intervalUnit).put("active", r.active).put("createdAt", r.createdAt).put("updatedAt", r.updatedAt)
+internal fun documentJson(d: GarageDocument) = JSONObject().put("id", d.id).put("vehicleId", d.vehicleId).put("name", d.name).put("mimeType", d.mimeType).put("category", d.category).put("size", d.size).put("addedAt", d.addedAt).put("updatedAt", d.updatedAt).put("maintenanceId", d.maintenanceId ?: JSONObject.NULL)
+internal fun vehicleFrom(j: JSONObject, photo: ByteArray?) = Vehicle(j.string("id"), j.string("name"), j.string("make"), j.string("model"), j.optInt("year"), j.string("plate"), j.optInt("mileage"), j.string("registrationDate"), photo, j.string("notes"), j.string("notesUpdatedAt"), j.optString("status", "active"), j.string("statusDate"), j.string("statusNote"), j.string("addedAt"), j.string("createdAt"), j.string("updatedAt"), j.string("fuel"), j.optString("vehicleType", "car").ifBlank { "car" })
+internal fun maintenanceFrom(j: JSONObject) = Maintenance(j.string("id"), j.string("vehicleId"), j.string("type"), j.string("customName"), j.string("date"), j.optInt("mileage"), j.optDouble("cost"), j.string("notes"), j.string("createdAt"), j.string("updatedAt"))
+internal fun reminderFrom(j: JSONObject) = Reminder(j.string("id"), j.string("maintenanceId"), j.string("type"), j.string("dueDate"), j.nullableInt("mileageThreshold"), j.nullableInt("intervalValue"), j.string("intervalUnit"), j.optBoolean("active", true), j.string("createdAt"), j.string("updatedAt"))
+internal fun documentFrom(j: JSONObject, bytes: ByteArray) = GarageDocument(j.string("id"), j.string("vehicleId"), j.string("name"), j.string("mimeType"), j.string("category"), j.optInt("size", bytes.size), bytes, j.string("addedAt"), j.string("updatedAt"), j.optString("maintenanceId").takeIf { it.isNotBlank() && it != "null" })
 
 fun dueReminders(state: GarageState): List<DueReminder> = state.reminders.mapNotNull { r ->
     val m = state.maintenances.firstOrNull { it.id == r.maintenanceId } ?: return@mapNotNull null

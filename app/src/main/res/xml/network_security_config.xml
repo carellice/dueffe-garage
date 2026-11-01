@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Server Garage: the app may talk to the user's own Garage server on CasaOS, normally in HTTPS through
+    Tailscale, but also in plain HTTP on the home network or behind a certificate the user installed.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

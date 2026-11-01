@@ -1,0 +1,113 @@
+/* Roboto, the font Compose uses on Android, as a variable font (weights 100-900). */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-display: block;
+  font-weight: 100 900;
+  src: url(/roboto-latin.woff2) format('woff2-variations'), url(/roboto-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-display: block;
+  font-weight: 100 900;
+  src: url(/roboto-latin-ext.woff2) format('woff2-variations'), url(/roboto-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--background);
+  color: var(--onSurface);
+  font-family: 'Roboto', system-ui, sans-serif;
+  /* bodyLarge, the default text style of Material 3 */
+  font-size: 16px;
+  line-height: 24px;
+  letter-spacing: 0.5px;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input, textarea { user-select: text; -webkit-user-select: text; font-family: inherit; }
+button { font-family: inherit; color: inherit; }
+svg { display: block; }
+
+.app {
+  position: relative;
+  height: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  overflow: clip;
+  background: var(--background);
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  background: var(--background);
+}
+
+.scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: clip;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.scroll::-webkit-scrollbar { display: none; }
+
+.status-pad { padding-top: env(safe-area-inset-top); }
+.nav-pad { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Every text style is written inline by the screens with the native numbers; these are the shared ones. */
+.kicker { font-size: 11px; line-height: 16px; font-weight: 900; text-transform: uppercase; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.accent-bg { background: linear-gradient(var(--ga, 135deg), var(--accentA), var(--accentB)); }
+.accent-text {
+  background: linear-gradient(var(--ga, 135deg), var(--accentA), var(--accentB));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tap { cursor: pointer; position: relative; overflow: hidden; }
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: currentColor;
+  transform: scale(0);
+  animation: ripple 450ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.12; }
+  70% { opacity: 0.1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* The Android 13+ toast: a pill with the app icon, in the colors of the system theme. */
+.toast { background: #ECE9F0; color: #1D1B20; }
+@media (prefers-color-scheme: dark) { .toast { background: #2B2930; color: #E6E0E9; } }
+
+#overlays { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+#overlays > * { pointer-events: auto; }
+
+input[type='number'] { -moz-appearance: textfield; }
+input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

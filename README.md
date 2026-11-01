@@ -21,6 +21,10 @@ L'app nativa è direttamente in questa repository. È scritta in Kotlin con Jetp
 
 I dati sono conservati sul dispositivo. La protezione all'apertura non cifra il database né i backup JSON.
 
+## Garage web e server di casa
+
+[`PWA/`](PWA/README.md) contiene la stessa app per il browser, da installare su un server CasaOS con un solo comando: account per ogni persona, promemoria come notifiche, aggiornamenti notturni. Dall'app Android, Impostazioni → **Server Garage** collega il telefono allo stesso account: i dati restano sul server e il telefono ne tiene una copia consultabile anche offline. Spento (predefinito), tutto resta sul telefono come prima.
+
 ## Avvio con doppio clic
 
 Apri [`Avvia Garage su Pixel.command`](Avvia%20Garage%20su%20Pixel.command). Lo script compila l'APK debug, avvia il primo emulatore Pixel configurato in Android Studio se necessario, installa e apre l'app. Per scegliere un altro emulatore: `GARAGE_AVD=Nome_AVD` nell'ambiente dello script. Su Windows usa [`Avvia Garage su Pixel.bat`](Avvia%20Garage%20su%20Pixel.bat).

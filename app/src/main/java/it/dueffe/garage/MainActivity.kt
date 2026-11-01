@@ -85,6 +85,9 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -183,6 +186,11 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     fun refresh() { state = repo.snapshot() }
+    val scope = rememberCoroutineScope()
+    val serverConfig by repo.serverStore.config.collectAsState()
+    var serverOpen by remember { mutableStateOf(false) }
+    /** A change through the repository: on the phone, or on the Garage server in server mode. [done] runs only when it was saved. */
+    fun write(work: suspend () -> Boolean, done: () -> Unit) { scope.launch { if (work()) { refresh(); done() } } }
     fun message(value: String) { Toast.makeText(context, value, Toast.LENGTH_SHORT).show() }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { photoUri = it }
     val documentPhotoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -197,6 +205,17 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         message(if (granted) "Notifiche abilitate" else "Permesso notifiche non concesso")
     }
     LaunchedEffect(Unit) { scheduleReminders(context, repo.notificationsEnabled) }
+    LaunchedEffect(Unit) { repo.errors.collect { Toast.makeText(context, it, Toast.LENGTH_LONG).show() } }
+    // Server mode: changes made on the web version or on other phones arrive every 30 seconds while the app is open.
+    LaunchedEffect(lifecycleOwner, serverConfig) {
+        if (serverConfig == null) return@LaunchedEffect
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                if (repo.refreshFromServer()) refresh()
+                delay(30_000)
+            }
+        }
+    }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         documentUri = uri
         documentName = uri?.let { pickedName(context, it).substringBeforeLast('.') } ?: ""
@@ -217,9 +236,10 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         }.onFailure { message("Backup non leggibile: ${it.message}") }
     }
     val selected = state.vehicles.firstOrNull { it.id == selectedId }
-    BackHandler(newVehicle || editVehicle != null || newMaintenance || editMaintenance != null || addDocument || editDocument != null || openMaintenanceId != null || openReminderId != null || openDocumentId != null || sectionsOpen || selectedId != null || page != "garage") {
+    BackHandler(serverOpen || newVehicle || editVehicle != null || newMaintenance || editMaintenance != null || addDocument || editDocument != null || openMaintenanceId != null || openReminderId != null || openDocumentId != null || sectionsOpen || selectedId != null || page != "garage") {
         lastTap = Offset.Unspecified
         when {
+            serverOpen -> serverOpen = false
             newMaintenance || editMaintenance != null -> { newMaintenance = false; editMaintenance = null }
             addDocument || editDocument != null -> { addDocument = false; editDocument = null; documentUri = null; documentName = ""; documentError = ""; documentMaintenanceId = null }
             newVehicle || editVehicle != null -> { newVehicle = false; editVehicle = null; photoUri = null }
@@ -264,7 +284,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         } else if (onboarding) {
             Onboarding { repo.onboardingDone = true; onboarding = false }
         } else {
-            val showNavigation = !newVehicle && editVehicle == null && !newMaintenance && editMaintenance == null && !addDocument && editDocument == null && openMaintenanceId == null && openReminderId == null && openDocumentId == null
+            val showNavigation = !serverOpen && !newVehicle && editVehicle == null && !newMaintenance && editMaintenance == null && !addDocument && editDocument == null && openMaintenanceId == null && openReminderId == null && openDocumentId == null
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
                 modifier = Modifier.fillMaxSize()
@@ -278,6 +298,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                     },
             ) { padding ->
                 val destination = when {
+                    serverOpen -> GarageDestination("server")
                     newVehicle || editVehicle != null -> GarageDestination("vehicle-editor", selectedId)
                     newMaintenance || editMaintenance != null -> GarageDestination("maintenance-editor", selectedId)
                     addDocument || editDocument != null -> GarageDestination("document-editor", selectedId, editDocument?.id)
@@ -300,7 +321,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                             val pair = setOf(initialState.screen, targetState.screen)
                             val buttonHero = pair == setOf("garage", "vehicle-editor") || pair == setOf("garage", "detail") || pair == setOf("detail", "sections")
                             val depth = mapOf("garage" to 0, "scadenze" to 0, "impostazioni" to 0, "detail" to 1, "sections" to 2,
-                                "maintenance-detail" to 3, "reminder-detail" to 3, "document-detail" to 3,
+                                "maintenance-detail" to 3, "reminder-detail" to 3, "document-detail" to 3, "server" to 1,
                                 "vehicle-editor" to 4, "maintenance-editor" to 4, "document-editor" to 4)
                             val goingBack = (depth[targetState.screen] ?: 0) < (depth[initialState.screen] ?: 0)
                             val recentTap = lastTap != Offset.Unspecified && SystemClock.uptimeMillis() - lastTapAt < 1200L
@@ -334,13 +355,14 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                         val pageModifier = if (containerKey != null) Modifier.containerTransform(containerKey, this@SharedTransitionLayout, this@AnimatedContent) else Modifier
                         Box(Modifier.fillMaxSize().then(pageModifier).garageBackdrop()) {
                         when (shown.screen) {
+                        "server" -> ServerScreen(repo, onBack = { serverOpen = false }, onDataChanged = { refresh(); selectedId = null; sectionsOpen = false })
                         "vehicle-editor" -> VehicleEditor(editVehicle, photoUri, { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onDismiss = { newVehicle = false; editVehicle = null; photoUri = null }, onSave = { value ->
-                                repo.save(value); refresh(); newVehicle = false; editVehicle = null; photoUri = null; selectedId = value.id; message("Auto salvata")
+                                write({ repo.saveAsync(value) }) { newVehicle = false; editVehicle = null; photoUri = null; selectedId = value.id; message("Auto salvata") }
                             }, repo = repo)
                         "maintenance-editor" -> selected?.let { MaintenanceEditor(selected, editMaintenance,
                             state.reminders.firstOrNull { it.maintenanceId == editMaintenance?.id },
-                            onDismiss = { newMaintenance = false; editMaintenance = null }, onSave = { m, r -> repo.save(m, r); refresh(); newMaintenance = false; editMaintenance = null; message("Intervento salvato") }) }
+                            onDismiss = { newMaintenance = false; editMaintenance = null }, onSave = { m, r -> write({ repo.saveAsync(m, r) }) { newMaintenance = false; editMaintenance = null; message("Intervento salvato") } }) }
                         "document-editor" -> selected?.let { DocumentEditor(documentUri, documentName, documentError,
                             existing = editDocument,
                             maintenances = state.maintenances.filter { it.vehicleId == selected.id },
@@ -360,10 +382,10 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                                     val mime = if (uri != null) context.contentResolver.getType(uri) ?: "application/octet-stream" else editDocument!!.mimeType
                                     require(documentMaintenanceId == null || state.maintenances.any { it.id == documentMaintenanceId && it.vehicleId == selected.id }) { "Intervento non disponibile" }
                                     val previous = editDocument
-                                    repo.save(GarageDocument(id = previous?.id ?: java.util.UUID.randomUUID().toString(), vehicleId = selected.id,
+                                    val document = GarageDocument(id = previous?.id ?: java.util.UUID.randomUUID().toString(), vehicleId = selected.id,
                                         name = documentName.trim(), mimeType = mime, category = if (mime.startsWith("image/")) "image" else if (mime == "application/pdf") "pdf" else "document",
-                                        size = bytes.size, data = bytes, addedAt = previous?.addedAt ?: now(), updatedAt = now(), maintenanceId = documentMaintenanceId))
-                                    refresh(); addDocument = false; editDocument = null; documentUri = null; documentName = ""; documentError = ""; documentMaintenanceId = null; message("Documento salvato")
+                                        size = bytes.size, data = bytes, addedAt = previous?.addedAt ?: now(), updatedAt = now(), maintenanceId = documentMaintenanceId)
+                                    write({ repo.saveAsync(document) }) { addDocument = false; editDocument = null; documentUri = null; documentName = ""; documentError = ""; documentMaintenanceId = null; message("Documento salvato") }
                                 }.onFailure { documentError = it.message ?: "File non leggibile" }
                             }) }
                         "maintenance-detail" -> state.maintenances.firstOrNull { it.id == shown.itemId }?.let { maintenance ->
@@ -387,7 +409,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                             onAddMaintenance = { newMaintenance = true }, onEditMaintenance = { editMaintenance = it }, onDeleteMaintenance = { deleteMaintenance = it },
                             onOpenMaintenance = { openMaintenanceId = it.id }, onOpenReminder = { openReminderId = it.reminder.id },
                             onAddDocument = { documentMaintenanceId = null; addDocument = true }, onOpenDocument = { openDocumentId = it.id }, onShareDocument = { shareDocument(context, it) }, onRenameDocument = { renameDocument = it }, onDeleteDocument = { deleteDocument = it },
-                            onNotes = { notes -> repo.save(selected.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())); refresh() },
+                            onNotes = { notes -> write({ repo.saveAsync(selected.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())) }) {} },
                             onCopyPlate = { copyPlate(context, selected.plate); message("Targa copiata") }) }
                         "garage" -> GarageHome(state, { newVehicle = true }, { selectedId = it; sectionsOpen = false; tab = "Interventi" }, this@SharedTransitionLayout, this@AnimatedContent)
                         "detail" -> selected?.let { vehicle ->
@@ -396,7 +418,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                                         onAddMaintenance = { newMaintenance = true }, onEditMaintenance = { editMaintenance = it }, onDeleteMaintenance = { deleteMaintenance = it },
                                         onOpenMaintenance = { openMaintenanceId = it.id }, onOpenReminder = { openReminderId = it.reminder.id },
                                         onAddDocument = { documentMaintenanceId = null; addDocument = true }, onOpenDocument = { documentToOpen = it }, onShareDocument = { shareDocument(context, it) }, onRenameDocument = { renameDocument = it }, onDeleteDocument = { deleteDocument = it },
-                                        onNotes = { notes -> repo.save(vehicle.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())); refresh() },
+                                        onNotes = { notes -> write({ repo.saveAsync(vehicle.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())) }) {} },
                                         onCopyPlate = { copyPlate(context, vehicle.plate); message("Targa copiata") }, backLabel = if (page == "scadenze") "Scadenze" else "Garage",
                                         sharedTransitionScope = this@SharedTransitionLayout, animatedVisibilityScope = this@AnimatedContent)
                         }
@@ -418,7 +440,8 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                                 else { biometric = false; repo.biometricEnabled = false }
                             }, onLock = { locked = true },
                             onExport = { exportPicker.launch("garage_${LocalDate.now()}.json") }, onImport = { importPicker.launch(arrayOf("application/json")) },
-                            onOnboarding = { onboarding = true }, onClear = { repo.clear(); refresh(); selectedId = null; message("Dati eliminati") })
+                            onOnboarding = { onboarding = true }, onClear = { write({ repo.clearAsync() }) { selectedId = null; message("Dati eliminati") } },
+                            serverActive = serverConfig != null, onServer = { serverOpen = true })
                         }
                         }
                     }
@@ -427,13 +450,13 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                 }
             }
         }
-        if (selected != null && statusEdit) StatusEditor(selected, { statusEdit = false }, { v -> repo.save(v); refresh(); statusEdit = false; message("Stato aggiornato") })
-        deleteVehicle?.let { item -> ConfirmDelete("Eliminare ${item.name} e tutti i suoi dati?", { deleteVehicle = null }, { repo.deleteVehicle(item.id); refresh(); selectedId = null; sectionsOpen = false; deleteVehicle = null }) }
-        deleteMaintenance?.let { item -> ConfirmDelete("Eliminare questo intervento e il suo promemoria?", { deleteMaintenance = null }, { repo.deleteMaintenance(item.id); refresh(); if (openMaintenanceId == item.id) openMaintenanceId = null; if (openReminderId != null) openReminderId = null; deleteMaintenance = null }) }
-        deleteReminder?.let { item -> ConfirmDelete("Eliminare questa scadenza? L'intervento resterà nel diario.", { deleteReminder = null }, { repo.deleteReminder(item.id); refresh(); if (openReminderId == item.id) openReminderId = null; deleteReminder = null }) }
-        deleteDocument?.let { item -> ConfirmDelete("Eliminare ${item.name}?", { deleteDocument = null }, { repo.deleteDocument(item.id); refresh(); if (openDocumentId == item.id) openDocumentId = null; deleteDocument = null }) }
-        renameDocument?.let { item -> var name by remember(item.id) { mutableStateOf(item.name) }; AlertDialog(onDismissRequest = { renameDocument = null }, title = { Text("Rinomina documento") }, text = { OutlinedTextField(name, { name = it }, label = { Text("Nome") }) }, confirmButton = { TextButton(onClick = { if (name.isNotBlank()) { repo.save(item.copy(name = name.trim(), updatedAt = now())); refresh(); renameDocument = null } }) { Text("Salva") } }, dismissButton = { TextButton(onClick = { renameDocument = null }) { Text("Annulla") } }) }
-        importedBytes?.let { bytes -> AlertDialog(onDismissRequest = { importedBytes = null }, title = { Text("Importa backup") }, text = { Text("$importSummary\n\nL'importazione sostituirà tutti i dati attuali. Il file non è cifrato.") }, confirmButton = { TextButton(onClick = { runCatching { repo.importBackup(bytes); refresh(); importedBytes = null; selectedId = null; message("Backup importato") }.onFailure { message("Importazione annullata: ${it.message}"); importedBytes = null } }) { Text("Importa") } }, dismissButton = { TextButton(onClick = { importedBytes = null }) { Text("Annulla") } }) }
+        if (selected != null && statusEdit) StatusEditor(selected, { statusEdit = false }, { v -> write({ repo.saveAsync(v) }) { statusEdit = false; message("Stato aggiornato") } })
+        deleteVehicle?.let { item -> ConfirmDelete("Eliminare ${item.name} e tutti i suoi dati?", { deleteVehicle = null }, { deleteVehicle = null; write({ repo.deleteVehicleAsync(item.id) }) { selectedId = null; sectionsOpen = false } }) }
+        deleteMaintenance?.let { item -> ConfirmDelete("Eliminare questo intervento e il suo promemoria?", { deleteMaintenance = null }, { deleteMaintenance = null; write({ repo.deleteMaintenanceAsync(item.id) }) { if (openMaintenanceId == item.id) openMaintenanceId = null; if (openReminderId != null) openReminderId = null } }) }
+        deleteReminder?.let { item -> ConfirmDelete("Eliminare questa scadenza? L'intervento resterà nel diario.", { deleteReminder = null }, { deleteReminder = null; write({ repo.deleteReminderAsync(item.id) }) { if (openReminderId == item.id) openReminderId = null } }) }
+        deleteDocument?.let { item -> ConfirmDelete("Eliminare ${item.name}?", { deleteDocument = null }, { deleteDocument = null; write({ repo.deleteDocumentAsync(item.id) }) { if (openDocumentId == item.id) openDocumentId = null } }) }
+        renameDocument?.let { item -> var name by remember(item.id) { mutableStateOf(item.name) }; AlertDialog(onDismissRequest = { renameDocument = null }, title = { Text("Rinomina documento") }, text = { OutlinedTextField(name, { name = it }, label = { Text("Nome") }) }, confirmButton = { TextButton(onClick = { if (name.isNotBlank()) write({ repo.saveAsync(item.copy(name = name.trim(), updatedAt = now())) }) { renameDocument = null } }) { Text("Salva") } }, dismissButton = { TextButton(onClick = { renameDocument = null }) { Text("Annulla") } }) }
+        importedBytes?.let { bytes -> AlertDialog(onDismissRequest = { importedBytes = null }, title = { Text("Importa backup") }, text = { Text("$importSummary\n\n" + if (serverConfig != null) "L'importazione sostituirà tutti i dati del tuo account sul server Garage. Il file non è cifrato." else "L'importazione sostituirà tutti i dati attuali. Il file non è cifrato.") }, confirmButton = { TextButton(onClick = { importedBytes = null; scope.launch { runCatching { repo.importBackupAsync(bytes) }.onSuccess { refresh(); selectedId = null; message("Backup importato") }.onFailure { message("Importazione annullata: ${it.message}") } } }) { Text("Importa") } }, dismissButton = { TextButton(onClick = { importedBytes = null }) { Text("Annulla") } }) }
         documentToOpen?.let { doc -> LaunchedEffect(doc) { openDocument(context, doc); documentToOpen = null } }
         if (pinSetup) PinSetupDialog(existingPin = hasPin, verifyPin = repo::verifyPin, onDismiss = { pinSetup = false; pinSetupEnablesProtection = false }, onSave = { pin ->
             repo.setPin(pin); hasPin = true; pinSetup = false

@@ -15,6 +15,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 
 class ReminderWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
@@ -25,6 +26,8 @@ class ReminderWorker(context: Context, params: WorkerParameters) : Worker(contex
         val manager = applicationContext.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel("garage_reminders", "Scadenze garage", NotificationManager.IMPORTANCE_DEFAULT))
         val prefs = applicationContext.getSharedPreferences("notified_reminders", Context.MODE_PRIVATE)
+        // Server mode: the deadlines come from the Garage server; the local copy is refreshed first.
+        runBlocking { repo.refreshFromServer() }
         dueReminders(repo.snapshot()).forEach { item ->
             val relevant = item.days?.let { it in 0..repo.notificationLeadDays.toLong() } == true || item.kmLeft?.let { it <= 0 } == true
             val key = "${item.reminder.dueDate}:${item.reminder.mileageThreshold}:${item.reminder.updatedAt}"
