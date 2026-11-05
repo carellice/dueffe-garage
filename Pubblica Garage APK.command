@@ -12,8 +12,8 @@ command -v gh >/dev/null || fail "Installa GitHub CLI (gh)"
 [[ -x ./gradlew ]] || fail "Gradle wrapper non trovato"
 gh auth status >/dev/null 2>&1 || fail "Accedi a GitHub con: gh auth login"
 
-OWNER="$(gh api user --jq .login)" || fail "Impossibile leggere l'account GitHub"
-REPO="${GARAGE_RELEASE_REPO:-${DUEFFE_RELEASE_REPO:-$OWNER/android-app-releases}}"
+# Le release vanno nella repository dell'app (origin), salvo GARAGE_RELEASE_REPO.
+REPO="${GARAGE_RELEASE_REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}" || fail "Impossibile leggere la repository GitHub dell'app"
 [[ "$(gh repo view "$REPO" --json visibility --jq .visibility)" == "PUBLIC" ]] || fail "La repo $REPO non è pubblica o non è accessibile"
 gh release list --repo "$REPO" --limit 1 >/dev/null || fail "Non posso leggere le release di $REPO"
 

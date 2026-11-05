@@ -15,7 +15,7 @@ android {
     namespace = "it.dueffe.garage"
     compileSdk = 36
     defaultConfig {
-        val updateRepo = providers.gradleProperty("updateRepository").getOrElse("carellice/android-app-releases")
+        val updateRepo = providers.gradleProperty("updateRepository").getOrElse("carellice/dueffe-garage")
         require(updateRepo.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))) { "updateRepository must be owner/repo" }
         buildConfigField("String", "UPDATE_REPOSITORY", "\"$updateRepo\"")
         applicationId = "it.dueffe.garage"

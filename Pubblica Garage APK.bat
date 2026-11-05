@@ -15,11 +15,10 @@ gh auth status >nul 2>&1 || (call :fail "Accedi a GitHub con: gh auth login" & e
 set "PYTHON=python"
 where python >nul 2>&1 || set "PYTHON=py -3"
 
-for /f "delims=" %%i in ('gh api user --jq .login') do set "OWNER=%%i"
-if not defined OWNER call :fail "Impossibile leggere l'account GitHub" & exit /b 1
+rem Le release vanno nella repository dell'app (origin), salvo GARAGE_RELEASE_REPO.
 set "REPO=%GARAGE_RELEASE_REPO%"
-if not defined REPO set "REPO=%DUEFFE_RELEASE_REPO%"
-if not defined REPO set "REPO=%OWNER%/android-app-releases"
+if not defined REPO for /f "delims=" %%i in ('gh repo view --json nameWithOwner --jq .nameWithOwner') do set "REPO=%%i"
+if not defined REPO call :fail "Impossibile leggere la repository GitHub dell'app" & exit /b 1
 set "VISIBILITY="
 for /f "delims=" %%i in ('gh repo view "%REPO%" --json visibility --jq .visibility') do set "VISIBILITY=%%i"
 if /i not "%VISIBILITY%"=="PUBLIC" call :fail "La repo %REPO% non e' pubblica o non e' accessibile" & exit /b 1

@@ -31,7 +31,7 @@ Apri [`Avvia Garage su Pixel.command`](Avvia%20Garage%20su%20Pixel.command). Lo 
 
 ## Release GitHub con doppio clic
 
-Apri [`Pubblica Garage APK.command`](Pubblica%20Garage%20APK.command) su macOS oppure [`Pubblica Garage APK.bat`](Pubblica%20Garage%20APK.bat) su Windows. I due script condividono `.release-secrets/`. Servono Android Studio, SDK, `gh` autenticato e accesso in scrittura alla repository pubblica `android-app-releases` dell'account GitHub attivo. Per usare un'altra repository pubblica, imposta `GARAGE_RELEASE_REPO=proprietario/android-app-releases`.
+Apri [`Pubblica Garage APK.command`](Pubblica%20Garage%20APK.command) su macOS oppure [`Pubblica Garage APK.bat`](Pubblica%20Garage%20APK.bat) su Windows. I due script condividono `.release-secrets/`. Servono Android Studio, SDK, `gh` autenticato e accesso in scrittura a questa repository, che deve essere pubblica: le release vengono pubblicate qui. Per usare un'altra repository pubblica, imposta `GARAGE_RELEASE_REPO=proprietario/repository`.
 
 Lo script:
 
