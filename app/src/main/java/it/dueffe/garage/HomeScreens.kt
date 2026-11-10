@@ -146,42 +146,46 @@ private fun greeting(): String = when (LocalTime.now().hour) { in 5..12 -> "Buon
     val active = state.vehicles.filter { it.status == "active" }
     val archived = state.vehicles.filter { it.status != "active" && "${it.name} ${it.make} ${it.plate}".contains(query, true) }
     val due = remember(state) { dueReminders(state) }
-    val year = LocalDate.now().year.toString()
-    val spent = state.maintenances.filter { it.date.startsWith(year) }.sumOf { it.cost }
     val soon = due.count { (it.days ?: Long.MAX_VALUE) <= 30 }
     val intro = remember { !homeIntroPlayed }
     LaunchedEffect(Unit) { homeIntroPlayed = true }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 120.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Column(Modifier.staggerIn(0, enabled = intro)) {
-                Text(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ITALY)).uppercase(Locale.ITALY),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(4.dp))
-                Text("${greeting()},", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                GradientText("il tuo garage", 40.sp)
+            // Il saluto a sinistra e il pulsante per aggiungere un'auto sempre a portata di pollice, in alto a destra.
+            Row(Modifier.fillMaxWidth().staggerIn(0, enabled = intro), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ITALY)).uppercase(Locale.ITALY),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text("${greeting()},", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    GradientText("il tuo garage", 40.sp)
+                }
+                val launchModifier = Modifier.containerTransform("add-vehicle-page", sharedTransitionScope, animatedVisibilityScope)
+                GradientButton(onClick = add, modifier = Modifier.padding(top = 6.dp).size(58.dp).then(launchModifier), shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp), shine = true) {
+                    Text("＋", fontSize = 30.sp, lineHeight = 30.sp, fontWeight = FontWeight.Light)
+                }
             }
         }
-        item {
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).staggerIn(1, enabled = intro), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatTile(R.drawable.ic_car, active.size, if (active.size == 1) "Auto attiva" else "Auto attive", Modifier.weight(1f), animate = intro)
-                StatTile(R.drawable.ic_clock, soon, "Entro 30 gg", Modifier.weight(1f), highlight = soon > 0, animate = intro)
-                StatTile(R.drawable.ic_coins, spent, "Spesi nel $year", Modifier.weight(1f), money = true, animate = intro)
-            }
+        if (active.isNotEmpty()) item {
+            val summary = buildList {
+                add("${active.size} ${if (active.size == 1) "auto" else "auto"} in garage")
+                add(if (soon == 0) "nessuna scadenza vicina" else if (soon == 1) "1 scadenza entro 30 giorni" else "$soon scadenze entro 30 giorni")
+            }.joinToString(" · ")
+            Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.staggerIn(1, enabled = intro))
         }
         due.firstOrNull()?.let { next -> item { NextDeadlineCard(next, Modifier.staggerIn(2, enabled = intro)) { open(next.vehicle.id) } } }
-        item {
-            val launchModifier = Modifier.containerTransform("add-vehicle-page", sharedTransitionScope, animatedVisibilityScope)
-            GradientButton(onClick = add, modifier = Modifier.fillMaxWidth().height(58.dp).staggerIn(3, enabled = intro).then(launchModifier), shine = true) {
-                Text("＋", fontSize = 26.sp, lineHeight = 26.sp, fontWeight = FontWeight.Light)
-                Spacer(Modifier.width(9.dp))
-                Text("Aggiungi auto", fontSize = 16.sp, fontWeight = FontWeight.Black)
-            }
-        }
         if (active.isEmpty()) item {
-            EmptyIllustration(R.drawable.ic_garage_nav,
-                if (state.vehicles.isEmpty()) "Il garage è pronto" else "Nessuna auto attiva",
-                if (state.vehicles.isEmpty()) "Aggiungi la tua prima auto per iniziare a tenere tutto sotto controllo." else "Aggiungi un'auto o consulta l'archivio.",
-                Modifier.staggerIn(4, enabled = intro))
+            Column(Modifier.staggerIn(3, enabled = intro), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                EmptyIllustration(R.drawable.ic_garage_nav,
+                    if (state.vehicles.isEmpty()) "Il garage è pronto" else "Nessuna auto attiva",
+                    if (state.vehicles.isEmpty()) "Aggiungi la tua prima auto: poi registri interventi, scadenze e documenti dalla sua pagina." else "Aggiungi un'auto o consulta l'archivio.")
+                GradientButton(onClick = add, modifier = Modifier.fillMaxWidth().height(58.dp), shine = true) {
+                    Text("＋", fontSize = 24.sp, lineHeight = 24.sp, fontWeight = FontWeight.Light)
+                    Spacer(Modifier.width(9.dp))
+                    Text(if (state.vehicles.isEmpty()) "Aggiungi la tua prima auto" else "Aggiungi auto", fontSize = 16.sp, fontWeight = FontWeight.Black)
+                }
+            }
         }
         else item {
             Text("LE TUE AUTO", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Black,
@@ -204,24 +208,6 @@ private fun greeting(): String = when (LocalTime.now().hour) { in 5..12 -> "Buon
                 itemsIndexed(archived, key = { _, v -> v.id }) { index, v -> VehicleCard(v, emptyList(), open, sharedTransitionScope, animatedVisibilityScope, Modifier.staggerIn(index + 1, enabled = intro)) }
             }
         }
-    }
-}
-
-@Composable private fun StatTile(icon: Int, value: Number, label: String, modifier: Modifier = Modifier, highlight: Boolean = false, money: Boolean = false, animate: Boolean = true) {
-    val dark = LocalGarageDark.current
-    val shape = RoundedCornerShape(22.dp)
-    Column(
-        modifier.fillMaxHeight().clip(shape)
-            .background(if (highlight) Brush.linearGradient(listOf(Amber.copy(alpha = if (dark) .30f else .22f), Ember.copy(alpha = if (dark) .16f else .10f)))
-                else Brush.linearGradient(listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface)))
-            .border(1.dp, if (highlight) Amber.copy(alpha = .45f) else MaterialTheme.colorScheme.outline.copy(alpha = .12f), shape)
-            .padding(horizontal = 12.dp, vertical = 13.dp)
-    ) {
-        Icon(painterResource(icon), contentDescription = null, tint = if (highlight) Amber else MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.height(10.dp))
-        AnimatedCount(value, androidx.compose.ui.text.TextStyle(fontSize = if (money) 22.sp else 26.sp, lineHeight = 30.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface),
-            animate = animate, format = if (money) { v -> String.format(Locale.ITALY, "€%,.0f", v) } else { v -> String.format(Locale.ITALY, "%d", v.toLong()) })
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -138,7 +138,6 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
     var state by remember { mutableStateOf(repo.snapshot()) }
     var page by remember { mutableStateOf(if ((context as MainActivity).intent?.getStringExtra("open_page") == "scadenze") "scadenze" else "garage") }
     var selectedId by remember { mutableStateOf<String?>(null) }
-    var sectionsOpen by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf("Interventi") }
     var editVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var newVehicle by remember { mutableStateOf(false) }
@@ -236,7 +235,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         }.onFailure { message("Backup non leggibile: ${it.message}") }
     }
     val selected = state.vehicles.firstOrNull { it.id == selectedId }
-    BackHandler(serverOpen || newVehicle || editVehicle != null || newMaintenance || editMaintenance != null || addDocument || editDocument != null || openMaintenanceId != null || openReminderId != null || openDocumentId != null || sectionsOpen || selectedId != null || page != "garage") {
+    BackHandler(serverOpen || newVehicle || editVehicle != null || newMaintenance || editMaintenance != null || addDocument || editDocument != null || openMaintenanceId != null || openReminderId != null || openDocumentId != null || selectedId != null || page != "garage") {
         lastTap = Offset.Unspecified
         when {
             serverOpen -> serverOpen = false
@@ -246,7 +245,6 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
             openMaintenanceId != null -> openMaintenanceId = null
             openReminderId != null -> openReminderId = null
             openDocumentId != null -> openDocumentId = null
-            sectionsOpen -> sectionsOpen = false
             selectedId != null -> selectedId = null
             else -> page = "garage"
         }
@@ -305,7 +303,6 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                     openMaintenanceId != null -> GarageDestination("maintenance-detail", selectedId, openMaintenanceId)
                     openReminderId != null -> GarageDestination("reminder-detail", selectedId, openReminderId)
                     openDocumentId != null -> GarageDestination("document-detail", selectedId, openDocumentId)
-                    sectionsOpen && selectedId != null -> GarageDestination("sections", selectedId)
                     selectedId != null -> GarageDestination("detail", selectedId)
                     page == "scadenze" -> GarageDestination("scadenze")
                     page == "impostazioni" -> GarageDestination("impostazioni")
@@ -319,8 +316,8 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                         modifier = Modifier.fillMaxSize(),
                         transitionSpec = {
                             val pair = setOf(initialState.screen, targetState.screen)
-                            val buttonHero = pair == setOf("garage", "vehicle-editor") || pair == setOf("garage", "detail") || pair == setOf("detail", "sections")
-                            val depth = mapOf("garage" to 0, "scadenze" to 0, "impostazioni" to 0, "detail" to 1, "sections" to 2,
+                            val buttonHero = pair == setOf("garage", "vehicle-editor") || pair == setOf("garage", "detail")
+                            val depth = mapOf("garage" to 0, "scadenze" to 0, "impostazioni" to 0, "detail" to 1,
                                 "maintenance-detail" to 3, "reminder-detail" to 3, "document-detail" to 3, "server" to 1,
                                 "vehicle-editor" to 4, "maintenance-editor" to 4, "document-editor" to 4)
                             val goingBack = (depth[targetState.screen] ?: 0) < (depth[initialState.screen] ?: 0)
@@ -349,13 +346,12 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                         val containerKey = when {
                             shown.screen == "vehicle-editor" && editVehicle == null -> "add-vehicle-page"
                             shown.screen == "detail" && page == "garage" -> "vehicle-page-${shown.vehicleId}"
-                            shown.screen == "sections" -> "sections-page-${shown.vehicleId}"
                             else -> null
                         }
                         val pageModifier = if (containerKey != null) Modifier.containerTransform(containerKey, this@SharedTransitionLayout, this@AnimatedContent) else Modifier
                         Box(Modifier.fillMaxSize().then(pageModifier).garageBackdrop()) {
                         when (shown.screen) {
-                        "server" -> ServerScreen(repo, onBack = { serverOpen = false }, onDataChanged = { refresh(); selectedId = null; sectionsOpen = false })
+                        "server" -> ServerScreen(repo, onBack = { serverOpen = false }, onDataChanged = { refresh(); selectedId = null })
                         "vehicle-editor" -> VehicleEditor(editVehicle, photoUri, { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onDismiss = { newVehicle = false; editVehicle = null; photoUri = null }, onSave = { value ->
                                 write({ repo.saveAsync(value) }) { newVehicle = false; editVehicle = null; photoUri = null; selectedId = value.id; message("Auto salvata") }
@@ -404,25 +400,18 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                                 onEdit = { editDocument = document; documentName = document.name; documentMaintenanceId = document.maintenanceId; documentUri = null; documentError = "" },
                                 onDelete = { deleteDocument = document })
                         }
-                        "sections" -> selected?.let { VehicleDetail(selected, state, tab, { tab = it }, sectionsPage = true, onClose = { sectionsOpen = false }, onOpenSections = {},
-                            onEdit = { editVehicle = selected }, onStatus = { statusEdit = true }, onDelete = { deleteVehicle = selected },
-                            onAddMaintenance = { newMaintenance = true }, onEditMaintenance = { editMaintenance = it }, onDeleteMaintenance = { deleteMaintenance = it },
-                            onOpenMaintenance = { openMaintenanceId = it.id }, onOpenReminder = { openReminderId = it.reminder.id },
-                            onAddDocument = { documentMaintenanceId = null; addDocument = true }, onOpenDocument = { openDocumentId = it.id }, onShareDocument = { shareDocument(context, it) }, onRenameDocument = { renameDocument = it }, onDeleteDocument = { deleteDocument = it },
-                            onNotes = { notes -> write({ repo.saveAsync(selected.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())) }) {} },
-                            onCopyPlate = { copyPlate(context, selected.plate); message("Targa copiata") }) }
-                        "garage" -> GarageHome(state, { newVehicle = true }, { selectedId = it; sectionsOpen = false; tab = "Interventi" }, this@SharedTransitionLayout, this@AnimatedContent)
+                        "garage" -> GarageHome(state, { newVehicle = true }, { selectedId = it; tab = "Interventi" }, this@SharedTransitionLayout, this@AnimatedContent)
                         "detail" -> selected?.let { vehicle ->
-                                    VehicleDetail(vehicle, state, tab, { tab = it }, sectionsPage = false, onClose = { selectedId = null }, onOpenSections = { tab = "Interventi"; sectionsOpen = true },
-                                        onEdit = { editVehicle = vehicle }, onStatus = { statusEdit = true }, onDelete = { deleteVehicle = vehicle },
-                                        onAddMaintenance = { newMaintenance = true }, onEditMaintenance = { editMaintenance = it }, onDeleteMaintenance = { deleteMaintenance = it },
-                                        onOpenMaintenance = { openMaintenanceId = it.id }, onOpenReminder = { openReminderId = it.reminder.id },
-                                        onAddDocument = { documentMaintenanceId = null; addDocument = true }, onOpenDocument = { documentToOpen = it }, onShareDocument = { shareDocument(context, it) }, onRenameDocument = { renameDocument = it }, onDeleteDocument = { deleteDocument = it },
-                                        onNotes = { notes -> write({ repo.saveAsync(vehicle.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())) }) {} },
-                                        onCopyPlate = { copyPlate(context, vehicle.plate); message("Targa copiata") }, backLabel = if (page == "scadenze") "Scadenze" else "Garage",
-                                        sharedTransitionScope = this@SharedTransitionLayout, animatedVisibilityScope = this@AnimatedContent)
+                            VehiclePage(vehicle, state, tab, { tab = it }, backLabel = if (page == "scadenze") "Scadenze" else "Garage", onBack = { selectedId = null },
+                                onEdit = { editVehicle = vehicle }, onStatus = { statusEdit = true }, onDelete = { deleteVehicle = vehicle },
+                                onCopyPlate = { copyPlate(context, vehicle.plate); message("Targa copiata") },
+                                onAddMaintenance = { newMaintenance = true }, onOpenMaintenance = { openMaintenanceId = it.id }, onOpenReminder = { openReminderId = it.reminder.id },
+                                onAddDocument = { documentMaintenanceId = null; addDocument = true }, onOpenDocument = { openDocumentId = it.id }, onShareDocument = { shareDocument(context, it) },
+                                onRenameDocument = { renameDocument = it }, onDeleteDocument = { deleteDocument = it },
+                                onNotes = { notes -> write({ repo.saveAsync(vehicle.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())) }) { message("Note salvate") } },
+                                sharedTransitionScope = this@SharedTransitionLayout, animatedVisibilityScope = this@AnimatedContent)
                         }
-                        "scadenze" -> ReminderScreen(state) { selectedId = it; sectionsOpen = false }
+                        "scadenze" -> ReminderScreen(state) { selectedId = it; tab = "Scadenze" }
                         else -> SettingsScreen(theme, { theme = it; repo.theme = it }, repo.lastChangeAt, repo.lastExportAt,
                             notifications = notifications, onNotifications = { enabled ->
                                 if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -446,12 +435,12 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                         }
                     }
                 }
-                if (showNavigation) FloatingGarageNavigation(page, Modifier.align(Alignment.BottomCenter)) { key -> selectedId = null; sectionsOpen = false; page = key }
+                if (showNavigation) FloatingGarageNavigation(page, Modifier.align(Alignment.BottomCenter)) { key -> selectedId = null; page = key }
                 }
             }
         }
         if (selected != null && statusEdit) StatusEditor(selected, { statusEdit = false }, { v -> write({ repo.saveAsync(v) }) { statusEdit = false; message("Stato aggiornato") } })
-        deleteVehicle?.let { item -> ConfirmDelete("Eliminare ${item.name} e tutti i suoi dati?", { deleteVehicle = null }, { deleteVehicle = null; write({ repo.deleteVehicleAsync(item.id) }) { selectedId = null; sectionsOpen = false } }) }
+        deleteVehicle?.let { item -> ConfirmDelete("Eliminare ${item.name} e tutti i suoi dati?", { deleteVehicle = null }, { deleteVehicle = null; write({ repo.deleteVehicleAsync(item.id) }) { selectedId = null } }) }
         deleteMaintenance?.let { item -> ConfirmDelete("Eliminare questo intervento e il suo promemoria?", { deleteMaintenance = null }, { deleteMaintenance = null; write({ repo.deleteMaintenanceAsync(item.id) }) { if (openMaintenanceId == item.id) openMaintenanceId = null; if (openReminderId != null) openReminderId = null } }) }
         deleteReminder?.let { item -> ConfirmDelete("Eliminare questa scadenza? L'intervento resterà nel diario.", { deleteReminder = null }, { deleteReminder = null; write({ repo.deleteReminderAsync(item.id) }) { if (openReminderId == item.id) openReminderId = null } }) }
         deleteDocument?.let { item -> ConfirmDelete("Eliminare ${item.name}?", { deleteDocument = null }, { deleteDocument = null; write({ repo.deleteDocumentAsync(item.id) }) { if (openDocumentId == item.id) openDocumentId = null } }) }
