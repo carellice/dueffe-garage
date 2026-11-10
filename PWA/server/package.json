@@ -1,6 +1,6 @@
 {
   "name": "garage-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Server di Garage PWA: dati in SQLite, account, lavori periodici e notifiche push.",
