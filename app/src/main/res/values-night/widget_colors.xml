@@ -1,6 +1,6 @@
 <resources>
-    <color name="widget_primary">#FFD775</color>
-    <color name="widget_foreground">#F7F1E2</color>
-    <color name="widget_secondary">#BEB297</color>
+    <color name="widget_primary">#6FD3FF</color>
+    <color name="widget_foreground">#EEF1F5</color>
+    <color name="widget_secondary">#8B95A7</color>
     <color name="widget_overdue">#FF8A80</color>
 </resources>

@@ -25,6 +25,10 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.BoundsTransform
@@ -93,11 +97,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-internal val Gold = Color(0xFFFFD84D)
-internal val Black = Color(0xFF09080A)
-private val Panel = Color(0xFF16141A)
-internal val Cream = Color(0xFFFFF8E9)
-internal val Muted = Color(0xFFB7A98E)
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -138,7 +137,6 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
     var state by remember { mutableStateOf(repo.snapshot()) }
     var page by remember { mutableStateOf(if ((context as MainActivity).intent?.getStringExtra("open_page") == "scadenze") "scadenze" else "garage") }
     var selectedId by remember { mutableStateOf<String?>(null) }
-    var tab by remember { mutableStateOf("Interventi") }
     var editVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var newVehicle by remember { mutableStateOf(false) }
     var editMaintenance by remember { mutableStateOf<Maintenance?>(null) }
@@ -148,6 +146,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
     var openMaintenanceId by remember { mutableStateOf<String?>(null) }
     var openReminderId by remember { mutableStateOf<String?>(null) }
     var openDocumentId by remember { mutableStateOf<String?>(null) }
+    var heroHidden by remember { mutableStateOf(false) }
     var statusEdit by remember { mutableStateOf(false) }
     var deleteVehicle by remember { mutableStateOf<Vehicle?>(null) }
     var deleteMaintenance by remember { mutableStateOf<Maintenance?>(null) }
@@ -235,6 +234,7 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         }.onFailure { message("Backup non leggibile: ${it.message}") }
     }
     val selected = state.vehicles.firstOrNull { it.id == selectedId }
+    LaunchedEffect(selectedId) { heroHidden = false }
     BackHandler(serverOpen || newVehicle || editVehicle != null || newMaintenance || editMaintenance != null || addDocument || editDocument != null || openMaintenanceId != null || openReminderId != null || openDocumentId != null || selectedId != null || page != "garage") {
         lastTap = Offset.Unspecified
         when {
@@ -250,30 +250,33 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         }
     }
     val isDark = when (theme) { "light" -> false; "dark" -> true; else -> androidx.compose.foundation.isSystemInDarkTheme() }
-    LaunchedEffect(isDark, onboarding) {
+    // Light status bar icons over the car photo, whatever the theme.
+    val overPhoto = selectedId != null && !serverOpen && !newVehicle && editVehicle == null && !newMaintenance && editMaintenance == null &&
+        !addDocument && editDocument == null && openMaintenanceId == null && openReminderId == null && openDocumentId == null && !heroHidden
+    LaunchedEffect(isDark, onboarding, overPhoto, locked) {
         val window = (context as MainActivity).window
         window.decorView.post {
-            WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !isDark && !onboarding
+            WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !isDark && !onboarding && (!overPhoto || locked)
         }
     }
     val colors = if (isDark) darkColorScheme(
-        primary = Gold, onPrimary = Black, background = Black, surface = Panel,
-        surfaceContainerLowest = Black, surfaceContainerLow = Panel, surfaceContainer = Panel,
-        surfaceContainerHigh = Color(0xFF221F25), surfaceContainerHighest = Color(0xFF2C2930),
-        surfaceVariant = Color(0xFF27242B), onSurfaceVariant = Muted, outline = Color(0xFF6E6252),
-        onBackground = Cream, onSurface = Cream, secondary = Muted,
-        secondaryContainer = Color(0xFF3D3214), onSecondaryContainer = Gold, error = Color(0xFFFF6B6B)
+        primary = Ice, onPrimary = Carbon, background = Carbon, surface = CarbonPanel,
+        surfaceContainerLowest = Carbon, surfaceContainerLow = CarbonPanel, surfaceContainer = CarbonPanel,
+        surfaceContainerHigh = CarbonRaised, surfaceContainerHighest = Color(0xFF212733),
+        surfaceVariant = CarbonRaised, onSurfaceVariant = Steel, outline = Color(0xFF5A6476),
+        onBackground = Frost, onSurface = Frost, secondary = Steel,
+        secondaryContainer = Ice.copy(alpha = .16f), onSecondaryContainer = Ice, error = Color(0xFFFF5A5F)
     ) else lightColorScheme(
-        primary = Color(0xFF8A5A00), onPrimary = Color.White, background = Color(0xFFF7F3EA), surface = Color.White,
-        surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFFFFCF5),
-        surfaceContainer = Color(0xFFF8F5ED), surfaceContainerHigh = Color(0xFFF0EBDF),
-        surfaceContainerHighest = Color(0xFFE9E2D3), surfaceVariant = Color(0xFFE9E2D3),
-        onSurfaceVariant = Color(0xFF665B46), outline = Color(0xFF85745A),
-        onBackground = Black, onSurface = Black, secondary = Color(0xFF665B46),
-        secondaryContainer = Color(0xFFFFE7A3), onSecondaryContainer = Color(0xFF3A2A00)
+        primary = IceDeep, onPrimary = Color.White, background = Color(0xFFF2F4F7), surface = Color.White,
+        surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF8F9FB),
+        surfaceContainer = Color(0xFFF2F4F7), surfaceContainerHigh = Color(0xFFE9ECF1),
+        surfaceContainerHighest = Color(0xFFE1E5EC), surfaceVariant = Color(0xFFE9ECF1),
+        onSurfaceVariant = Color(0xFF5B6475), outline = Color(0xFF7A8496),
+        onBackground = Color(0xFF0B0D12), onSurface = Color(0xFF0B0D12), secondary = Color(0xFF5B6475),
+        secondaryContainer = Color(0xFFDCE9FB), onSecondaryContainer = Color(0xFF0A3D7A), error = Color(0xFFC62828)
     )
     CompositionLocalProvider(LocalGarageDark provides isDark) {
-    MaterialTheme(colorScheme = colors, typography = garageTypography(), shapes = Shapes(small = RoundedCornerShape(14.dp), medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(28.dp), extraLarge = RoundedCornerShape(32.dp))) {
+    MaterialTheme(colorScheme = colors, typography = garageTypography(), shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(22.dp), extraLarge = RoundedCornerShape(28.dp))) {
         if (locked) {
             GarageLockScreen(hasPin = hasPin, pinLength = repo.pinLength, biometric = biometric && (context as MainActivity).canUseBiometrics(), isDark = isDark,
                 verifyPin = repo::verifyPin, onUnlocked = { locked = false },
@@ -282,9 +285,10 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
         } else if (onboarding) {
             Onboarding { repo.onboardingDone = true; onboarding = false }
         } else {
-            val showNavigation = !serverOpen && !newVehicle && editVehicle == null && !newMaintenance && editMaintenance == null && !addDocument && editDocument == null && openMaintenanceId == null && openReminderId == null && openDocumentId == null
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
+                // Every screen handles the system bars itself, so photos can run under the status bar.
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 modifier = Modifier.fillMaxSize()
                     .onGloballyPositioned { scaffoldOrigin = it.positionInRoot() }
                     .pointerInput(Unit) {
@@ -315,41 +319,30 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                         targetState = destination,
                         modifier = Modifier.fillMaxSize(),
                         transitionSpec = {
-                            val pair = setOf(initialState.screen, targetState.screen)
-                            val buttonHero = pair == setOf("garage", "vehicle-editor") || pair == setOf("garage", "detail")
-                            val depth = mapOf("garage" to 0, "scadenze" to 0, "impostazioni" to 0, "detail" to 1,
-                                "maintenance-detail" to 3, "reminder-detail" to 3, "document-detail" to 3, "server" to 1,
+                            val depth = mapOf("garage" to 0, "scadenze" to 1, "impostazioni" to 1, "detail" to 2, "server" to 2,
+                                "maintenance-detail" to 3, "reminder-detail" to 3, "document-detail" to 3,
                                 "vehicle-editor" to 4, "maintenance-editor" to 4, "document-editor" to 4)
                             val goingBack = (depth[targetState.screen] ?: 0) < (depth[initialState.screen] ?: 0)
-                            val recentTap = lastTap != Offset.Unspecified && SystemClock.uptimeMillis() - lastTapAt < 1200L
-                            val tapOrigin = if (recentTap && contentBounds.width > 0f && contentBounds.height > 0f) TransformOrigin(
-                                ((lastTap.x - contentBounds.left) / contentBounds.width).coerceIn(0f, 1f),
-                                ((lastTap.y - contentBounds.top) / contentBounds.height).coerceIn(0f, 1f)
-                            ) else TransformOrigin.Center
-                            if (!goingBack && !buttonHero) openingOrigins[targetState] = tapOrigin
-                            val origin = if (goingBack) openingOrigins[initialState] ?: TransformOrigin.Center else tapOrigin
-                            val enter = if (buttonHero) fadeIn(tween(if (goingBack) 120 else 260)) else if (goingBack) fadeIn(tween(180)) else scaleIn(
-                                initialScale = if (recentTap && !goingBack) 0.12f else 0.94f,
-                                transformOrigin = origin,
-                                animationSpec = tween(340, easing = FastOutSlowInEasing)
-                            ) + fadeIn(tween(110))
-                            val exit = if (buttonHero) fadeOut(tween(if (goingBack) 300 else 140)) else if (!goingBack) fadeOut(tween(150)) else scaleOut(
-                                targetScale = if (goingBack && openingOrigins.containsKey(initialState)) 0.12f else 0.96f,
-                                transformOrigin = origin,
-                                animationSpec = tween(if (goingBack) 300 else 230, easing = FastOutSlowInEasing)
-                            ) + fadeOut(tween(if (goingBack) 110 else 140, delayMillis = if (goingBack) 190 else 130))
-                            (enter togetherWith exit).using(SizeTransform(clip = false))
+                            val pair = setOf(initialState.screen, targetState.screen)
+                            val editor = (if (goingBack) initialState else targetState).screen.endsWith("editor")
+                            val easing = FastOutSlowInEasing
+                            when {
+                                // Home <-> car: the photo flies between them, the rest crossfades.
+                                pair == setOf("garage", "detail") -> fadeIn(tween(300, 60)) togetherWith fadeOut(tween(200))
+                                // Editors rise from the bottom like a sheet and sink back.
+                                editor && !goingBack -> (slideInVertically(tween(380, easing = easing)) { it / 7 } + fadeIn(tween(260))) togetherWith fadeOut(tween(200))
+                                editor -> fadeIn(tween(220)) togetherWith (slideOutVertically(tween(300, easing = easing)) { it / 7 } + fadeOut(tween(220)))
+                                // Deeper pages push in from the right; back pops them out.
+                                !goingBack -> (slideInHorizontally(tween(380, easing = easing)) { it / 4 } + fadeIn(tween(300))) togetherWith
+                                    (slideOutHorizontally(tween(380, easing = easing)) { -it / 10 } + fadeOut(tween(220)))
+                                else -> (slideInHorizontally(tween(380, easing = easing)) { -it / 10 } + fadeIn(tween(300))) togetherWith
+                                    (slideOutHorizontally(tween(340, easing = easing)) { it / 4 } + fadeOut(tween(200)))
+                            }.using(SizeTransform(clip = false))
                         },
                         label = "garage_navigation"
                     ) { shown ->
                         val selected = state.vehicles.firstOrNull { it.id == shown.vehicleId }
-                        val containerKey = when {
-                            shown.screen == "vehicle-editor" && editVehicle == null -> "add-vehicle-page"
-                            shown.screen == "detail" && page == "garage" -> "vehicle-page-${shown.vehicleId}"
-                            else -> null
-                        }
-                        val pageModifier = if (containerKey != null) Modifier.containerTransform(containerKey, this@SharedTransitionLayout, this@AnimatedContent) else Modifier
-                        Box(Modifier.fillMaxSize().then(pageModifier).garageBackdrop()) {
+                        Box(Modifier.fillMaxSize().cockpitBackdrop()) {
                         when (shown.screen) {
                         "server" -> ServerScreen(repo, onBack = { serverOpen = false }, onDataChanged = { refresh(); selectedId = null })
                         "vehicle-editor" -> VehicleEditor(editVehicle, photoUri, { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -400,19 +393,22 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                                 onEdit = { editDocument = document; documentName = document.name; documentMaintenanceId = document.maintenanceId; documentUri = null; documentError = "" },
                                 onDelete = { deleteDocument = document })
                         }
-                        "garage" -> GarageHome(state, { newVehicle = true }, { selectedId = it; tab = "Interventi" }, this@SharedTransitionLayout, this@AnimatedContent)
+                        "garage" -> GarageHome(state, add = { newVehicle = true }, open = { selectedId = it },
+                            openReminder = { selectedId = it.vehicle.id; openReminderId = it.reminder.id },
+                            openAgenda = { page = "scadenze" }, openSettings = { page = "impostazioni" },
+                            sharedTransitionScope = this@SharedTransitionLayout, animatedVisibilityScope = this@AnimatedContent)
                         "detail" -> selected?.let { vehicle ->
-                            VehiclePage(vehicle, state, tab, { tab = it }, backLabel = if (page == "scadenze") "Scadenze" else "Garage", onBack = { selectedId = null },
+                            VehiclePage(vehicle, state, backLabel = if (page == "scadenze") "Scadenze" else "Garage", onBack = { selectedId = null },
                                 onEdit = { editVehicle = vehicle }, onStatus = { statusEdit = true }, onDelete = { deleteVehicle = vehicle },
                                 onCopyPlate = { copyPlate(context, vehicle.plate); message("Targa copiata") },
                                 onAddMaintenance = { newMaintenance = true }, onOpenMaintenance = { openMaintenanceId = it.id }, onOpenReminder = { openReminderId = it.reminder.id },
                                 onAddDocument = { documentMaintenanceId = null; addDocument = true }, onOpenDocument = { openDocumentId = it.id }, onShareDocument = { shareDocument(context, it) },
                                 onRenameDocument = { renameDocument = it }, onDeleteDocument = { deleteDocument = it },
-                                onNotes = { notes -> write({ repo.saveAsync(vehicle.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())) }) { message("Note salvate") } },
+                                onNotes = { notes -> write({ repo.saveAsync(vehicle.copy(notes = notes, notesUpdatedAt = now(), updatedAt = now())) }) { message("Note salvate") } }, onHeroHidden = { heroHidden = it },
                                 sharedTransitionScope = this@SharedTransitionLayout, animatedVisibilityScope = this@AnimatedContent)
                         }
-                        "scadenze" -> ReminderScreen(state) { selectedId = it; tab = "Scadenze" }
-                        else -> SettingsScreen(theme, { theme = it; repo.theme = it }, repo.lastChangeAt, repo.lastExportAt,
+                        "scadenze" -> ReminderScreen(state, onBack = { page = "garage" }) { selectedId = it.vehicle.id; openReminderId = it.reminder.id }
+                        else -> SettingsScreen(onBack = { page = "garage" }, theme = theme, changeTheme = { theme = it; repo.theme = it }, lastChange = repo.lastChangeAt, lastExport = repo.lastExportAt,
                             notifications = notifications, onNotifications = { enabled ->
                                 if (enabled && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 else { notifications = enabled; repo.notificationsEnabled = enabled; scheduleReminders(context, enabled) }
@@ -435,7 +431,9 @@ private data class GarageDestination(val screen: String, val vehicleId: String? 
                         }
                     }
                 }
-                if (showNavigation) FloatingGarageNavigation(page, Modifier.align(Alignment.BottomCenter)) { key -> selectedId = null; page = key }
+                // Content scrolling under the status bar fades out beneath it.
+                if (!overPhoto) Box(Modifier.fillMaxWidth().windowInsetsTopHeight(WindowInsets.statusBars).background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background.copy(alpha = .75f)))))
                 }
             }
         }

@@ -83,14 +83,15 @@ private fun counts(vehicles: Int, maintenances: Int, documents: Int) = "$vehicle
         } finally { busy = false }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 18.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
-        GarageBackButton("Impostazioni", onBack)
-        SectionHeading("Sincronizzazione", "Server Garage", "Gli stessi dati della versione web, su ogni dispositivo.")
+    Column(Modifier.fillMaxSize().imePadding()) {
+    PageTopBar("", onBack, "Impostazioni")
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 18.dp).padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        PageHeading("Sincronizzazione", "Server Garage", "Gli stessi dati della versione web, su ogni dispositivo.", Modifier.padding(horizontal = 2.dp).staggerIn(0))
         val active = config
         if (active == null) {
-            GlassCard(Modifier.fillMaxWidth().staggerIn(1), padding = 17.dp) {
+            Panel(Modifier.fillMaxWidth().staggerIn(1), padding = 17.dp) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Collega il server", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text("Collega il server", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Text("Usa l'indirizzo di Garage sul tuo server CasaOS, per esempio quello di Tailscale. Senza connessione potrai consultare i dati ma non modificarli.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 18.sp)
                     OutlinedTextField(url, { url = it; error = "" }, label = { Text("Indirizzo del server") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -105,15 +106,15 @@ private fun counts(vehicles: Int, maintenances: Int, documents: Int) = "$vehicle
                     OutlinedTextField(password, { password = it; error = "" }, label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
                     if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-                    GradientButton(onClick = { if (!busy) connect() }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp), enabled = !busy) {
+                    AccentButton(onClick = { if (!busy) connect() }, modifier = Modifier.fillMaxWidth(), enabled = !busy) {
                         Text(if (busy) "Collegamento…" else "Collega il server", fontWeight = FontWeight.Bold)
                     }
                 }
             }
         } else {
-            GlassCard(Modifier.fillMaxWidth().staggerIn(1), padding = 17.dp) {
+            Panel(Modifier.fillMaxWidth().staggerIn(1), padding = 17.dp) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Attivo", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    StatusPill("Collegato", urgencyFor(365).color)
                     Text("${active.username} su ${active.url.substringAfter("://")}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     Text(when {
                         status.error.isNotBlank() -> status.error
@@ -122,15 +123,15 @@ private fun counts(vehicles: Int, maintenances: Int, documents: Int) = "$vehicle
                     }, color = if (status.error.isNotBlank()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                     Text("Le modifiche vanno subito sul server; senza connessione i dati restano consultabili ma non modificabili.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp)
-                    GradientButton(onClick = { scope.launch { busy = true; if (repo.refreshFromServer(force = true)) onDataChanged(); busy = false } },
-                        modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp), enabled = !busy) {
+                    AccentButton(onClick = { scope.launch { busy = true; if (repo.refreshFromServer(force = true)) onDataChanged(); busy = false } },
+                        modifier = Modifier.fillMaxWidth(), enabled = !busy) {
                         Text(if (busy) "Aggiornamento…" else "Aggiorna ora", fontWeight = FontWeight.Bold)
                     }
-                    OutlinedButton(onClick = { disconnect = true }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Scollega il server", fontWeight = FontWeight.SemiBold) }
+                    GhostButton(onClick = { disconnect = true }, modifier = Modifier.fillMaxWidth(), danger = true) { Text("Scollega il server", fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
+    }
     }
 
     choice?.let { pending ->

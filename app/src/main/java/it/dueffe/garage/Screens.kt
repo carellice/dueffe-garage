@@ -124,72 +124,67 @@ internal fun vehicleTypeLabel(type: String) = vehicleTypes[type] ?: "Altro"
     }
 }
 
-@Composable internal fun GarageBackButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    FilledTonalButton(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(24.dp), contentPadding = PaddingValues(horizontal = 15.dp, vertical = 9.dp)) {
-        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(7.dp))
-        Text(label, fontWeight = FontWeight.SemiBold)
+/**
+ * Full-screen editor frame: close button, big title, the form scrolling in between and the save bar
+ * pinned at the bottom (above the keyboard when it is open).
+ */
+@Composable internal fun EditorScaffold(
+    overline: String, title: String, subtitle: String, onDismiss: () -> Unit, saveLabel: String,
+    scroll: androidx.compose.foundation.ScrollState = rememberScrollState(), header: @Composable RowScope.() -> Unit = {},
+    onSave: () -> Unit, content: @Composable ColumnScope.() -> Unit
+) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            RoundIconButton(R.drawable.ic_close, "Chiudi senza salvare", onDismiss)
+        }
+        Column(Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = 20.dp).padding(top = 6.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).staggerIn(0), verticalAlignment = Alignment.CenterVertically) {
+                PageHeading(overline, title, subtitle, Modifier.weight(1f))
+                header()
+            }
+            content()
+        }
+        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+            HorizontalDivider(color = hairline())
+            Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GhostButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Annulla") }
+                AccentButton(onClick = onSave, modifier = Modifier.weight(1.5f)) { Text(saveLabel, maxLines = 1) }
+            }
+        }
     }
 }
 
-private fun notesUpdatedLabel(value: String): String = if (value.isBlank()) "Mai" else runCatching {
-    dateLabel(Instant.parse(value).atZone(ZoneId.systemDefault()).toLocalDate().toString())
+private fun notesUpdatedLabel(value: String): String = if (value.isBlank()) "Mai modificate" else runCatching {
+    "Modificate il " + dateLabel(Instant.parse(value).atZone(ZoneId.systemDefault()).toLocalDate().toString())
 }.getOrDefault(value)
 
-@Composable private fun NotesUpdatedBadge(updatedAt: String) {
-    Row(
-        Modifier.clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
-        Icon(painterResource(R.drawable.ic_clock), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-        Text("Ultima modifica: ${notesUpdatedLabel(updatedAt)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1)
-    }
-}
-
-@Composable internal fun GarageNotesCard(updatedAt: String, value: String, onValueChange: (String) -> Unit, onSave: () -> Unit) {
+/** The car's notes, edited in place; "Salva" appears only when something changed. */
+@Composable internal fun GarageNotesCard(updatedAt: String, value: String, onValueChange: (String) -> Unit, changed: Boolean, onSave: () -> Unit) {
     val requester = remember { BringIntoViewRequester() }
     var focused by remember { mutableStateOf(false) }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     LaunchedEffect(focused, imeBottom) { if (focused && imeBottom > 0) requester.bringIntoView() }
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surface)
-            .padding(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val heading: @Composable () -> Unit = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    GradientIcon(R.drawable.ic_note, 56.dp, 27.dp)
-                    Column {
-                        Text("Appunti", fontSize = 27.sp, lineHeight = 30.sp, fontWeight = FontWeight.Black)
-                        Text("Note e promemoria sulla tua auto.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                    }
+    Panel(Modifier.fillMaxWidth().bringIntoViewRequester(requester), padding = 16.dp) {
+        BasicTextField(
+            value = value, onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp).onFocusChanged { focused = it.isFocused }.semantics { contentDescription = "Note sull'auto" },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface, lineHeight = 23.sp),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            decorationBox = { inner -> Box {
+                if (value.isEmpty()) Text("Scrivi qui le tue note sull'auto: gomme, misure, officina di fiducia…", color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 23.sp)
+                inner()
+            } }
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(painterResource(R.drawable.ic_clock), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(notesUpdatedLabel(updatedAt), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1)
+            AnimatedVisibility(changed, enter = fadeIn() + androidx.compose.animation.scaleIn(initialScale = .8f), exit = fadeOut()) {
+                AccentButton(onClick = onSave, modifier = Modifier.heightIn(min = 40.dp), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 16.dp)) {
+                    Text("Salva note", fontSize = 14.sp)
                 }
             }
-            if (maxWidth >= 560.dp) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { heading() }
-                NotesUpdatedBadge(updatedAt)
-            } else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                heading()
-                NotesUpdatedBadge(updatedAt)
-            }
-        }
-        OutlinedTextField(
-            value = value, onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth().height(210.dp).bringIntoViewRequester(requester)
-                .onFocusChanged { focused = it.isFocused },
-            placeholder = { Text("Scrivi le tue note sull'auto...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            shape = RoundedCornerShape(16.dp), minLines = 6,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-            )
-        )
-        GradientButton(onClick = onSave, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(28.dp)) {
-            Text("Salva note", fontSize = 17.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -254,75 +249,24 @@ internal fun reminderStatus(item: DueReminder): String {
     }
 }
 
-@Composable internal fun ReminderListCard(item: DueReminder, modifier: Modifier = Modifier, showVehicle: Boolean = false, onClick: () -> Unit) {
-    val appearance = maintenanceAppearance(item.maintenance.type)
-    val dueDate = reminderDueDate(item)
-    val status = reminderStatus(item)
-    val urgency = urgencyFor(item.days)
-    val statusTint = urgency.color
-    val statusBackground = urgency.color.copy(alpha = .14f)
-    val pulse = rememberInfiniteTransition(label = "urgent")
-    val glow by pulse.animateFloat(.35f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "urgent_glow")
-    val urgent = (item.days ?: Long.MAX_VALUE) < 0
-    val shape = RoundedCornerShape(22.dp)
-    Row(
-        modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, if (urgent) statusTint.copy(alpha = .25f + .35f * glow) else MaterialTheme.colorScheme.outline.copy(alpha = .1f), shape)
-            .bouncyClick(onClickLabel = "Apri scadenza ${appearance.label}", onClick = onClick)
-            .drawBehind { drawRect(statusTint, size = Size(4.dp.toPx(), size.height)) }
-            .padding(start = 16.dp, end = 12.dp, top = 13.dp, bottom = 13.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Box(Modifier.size(54.dp).background(appearance.background, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(painterResource(appearance.icon), contentDescription = null, tint = appearance.tint, modifier = Modifier.size(27.dp))
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            if (showVehicle) Text(item.vehicle.name.uppercase(Locale.ITALY), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp,
-                letterSpacing = 1.5.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            else Text(appearance.label, modifier = Modifier.clip(RoundedCornerShape(15.dp)).background(appearance.background)
-                .padding(horizontal = 9.dp, vertical = 2.dp), color = appearance.tint, fontSize = 11.sp,
-                fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(when (item.maintenance.type) { "service" -> "Tagliando periodico"; "tax" -> "Bollo auto"; else -> maintenanceLabel(item.maintenance) },
-                fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(reminderSubtitle(item), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (dueDate.isNotBlank()) {
-                    Icon(painterResource(R.drawable.ic_calendar_nav), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                    Text(dateLabel(dueDate), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
-                }
-                if (item.kmLeft != null && item.reminder.type != "mileage") {
-                    Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                    Icon(painterResource(R.drawable.ic_speedometer), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                    Text("${item.reminder.mileageThreshold?.formatKm() ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
-                } else if (item.reminder.type == "mileage" && item.reminder.mileageThreshold != null) {
-                    Icon(painterResource(R.drawable.ic_speedometer), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                    Text(item.reminder.mileageThreshold.formatKm(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
-                }
-            }
-        }
-        Row(Modifier.clip(RoundedCornerShape(24.dp)).background(statusBackground)
-            .padding(horizontal = 9.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(painterResource(R.drawable.ic_clock), contentDescription = null, tint = statusTint, modifier = Modifier.size(15.dp))
-            Text(status, color = statusTint, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-        }
-    }
-}
 
 @Composable internal fun MaintenanceFilterPill(type: String, selected: Boolean, onClick: () -> Unit) {
     val appearance = maintenanceAppearance(type)
-    val shape = RoundedCornerShape(14.dp)
+    FilterPill(if (type == "all") "Tutti" else appearance.label, if (type == "all") null else appearance.icon, selected, onClick)
+}
+
+@Composable private fun FilterPill(label: String, icon: Int?, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(50)
+    val fg = if (selected) onAccent() else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        Modifier.height(43.dp).clip(shape)
-            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.outline.copy(alpha = .38f), shape)
-            .bouncyClick(onClick = onClick).padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Modifier.height(38.dp).clip(shape)
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+            .border(1.dp, if (selected) Color.Transparent else hairline(), shape)
+            .bouncyClick(role = Role.RadioButton, onClick = onClick).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
-        if (type != "all") Icon(painterResource(appearance.icon), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(19.dp))
-        Text(if (type == "all") "Tutti" else appearance.label, fontSize = 13.sp,
-            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+        if (icon != null) Icon(painterResource(icon), contentDescription = null, tint = fg, modifier = Modifier.size(17.dp))
+        Text(label, fontSize = 13.sp, color = fg, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
     }
 }
 
@@ -347,21 +291,7 @@ internal fun documentCategory(document: GarageDocument, maintenances: List<Maint
 
 @Composable internal fun DocumentFilterPill(category: String, selected: Boolean, onClick: () -> Unit) {
     val appearance = documentAppearance(category)
-    val shape = RoundedCornerShape(13.dp)
-    Row(
-        Modifier.height(43.dp).clip(shape)
-            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.outline.copy(alpha = .38f), shape)
-            .bouncyClick(onClick = onClick).padding(horizontal = 13.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Icon(painterResource(if (category == "all") R.drawable.ic_folder else appearance.icon), contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp))
-        Text(if (category == "all") "Tutti" else appearance.label, fontSize = 13.sp,
-            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
-    }
+    FilterPill(if (category == "all") "Tutti" else appearance.label, if (category == "all") null else appearance.icon, selected, onClick)
 }
 
 internal fun documentSize(size: Int): String = if (size >= 1_000_000) {
@@ -372,7 +302,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
     dateLabel(Instant.parse(timestamp).atZone(ZoneId.systemDefault()).toLocalDate().toString())
 }.getOrDefault(timestamp.take(10))
 
-@Composable internal fun DocumentThumbnail(document: GarageDocument, category: String, modifier: Modifier = Modifier.size(72.dp), maxPixels: Int = 320) {
+@Composable internal fun DocumentThumbnail(document: GarageDocument, category: String, modifier: Modifier = Modifier.size(72.dp), maxPixels: Int = 320, corner: androidx.compose.ui.unit.Dp = 13.dp) {
     val context = LocalContext.current
     val preview by produceState<Bitmap?>(initialValue = null, document.id, document.updatedAt) {
         value = withContext(Dispatchers.IO) {
@@ -409,108 +339,15 @@ internal fun documentDate(timestamp: String): String = runCatching {
             }.getOrNull()
         }
     }
-    Box(modifier.clip(RoundedCornerShape(13.dp)).background(documentAppearance(category).background), contentAlignment = Alignment.Center) {
+    Box(modifier.clip(RoundedCornerShape(corner)).background(documentAppearance(category).background), contentAlignment = Alignment.Center) {
         if (preview != null) Image(preview!!.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         else Icon(painterResource(R.drawable.ic_document), contentDescription = null, tint = documentAppearance(category).tint, modifier = Modifier.size(32.dp))
     }
 }
 
-@Composable internal fun DocumentListCard(
-    document: GarageDocument, category: String, onOpen: () -> Unit, onShare: () -> Unit,
-    onRename: () -> Unit, onDelete: () -> Unit
-) {
-    val appearance = documentAppearance(category)
-    var menuOpen by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surface)
-            .bouncyClick(onClickLabel = "Apri ${document.name}", onClick = onOpen)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        DocumentThumbnail(document, category)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(appearance.label, modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(appearance.background)
-                .padding(horizontal = 9.dp, vertical = 2.dp), color = appearance.tint, fontSize = 11.sp,
-                fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(document.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            val format = when (document.mimeType) { "application/pdf" -> "PDF"; "image/jpeg" -> "JPG"; "image/png" -> "PNG"; else -> document.name.substringAfterLast('.', "FILE").uppercase(Locale.ITALY) }
-            Text("$format · ${documentSize(document.size)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Icon(painterResource(R.drawable.ic_calendar_nav), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
-                Text(documentDate(document.addedAt), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-            }
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Box {
-                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(40.dp)) {
-                    Icon(painterResource(R.drawable.ic_more), contentDescription = "Altre azioni", modifier = Modifier.size(20.dp))
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(text = { Text("Rinomina") }, onClick = { menuOpen = false; onRename() })
-                    DropdownMenuItem(text = { Text("Elimina") }, onClick = { menuOpen = false; onDelete() })
-                }
-            }
-            TextButton(onClick = onShare, contentPadding = PaddingValues(horizontal = 0.dp)) {
-                Icon(painterResource(R.drawable.ic_share), contentDescription = null, modifier = Modifier.size(19.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Condividi", fontSize = 12.sp)
-            }
-        }
-    }
-}
-
-@Composable internal fun MaintenanceListCard(
-    maintenance: Maintenance, onOpen: () -> Unit
-) {
-    val appearance = maintenanceAppearance(maintenance.type)
-    val title = when (maintenance.type) {
-        "inspection" -> "Revisione periodica"
-        "tax" -> "Bollo auto"
-        else -> maintenanceLabel(maintenance)
-    }
-    val shape = RoundedCornerShape(22.dp)
-    Column(
-        Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
-            .bouncyClick(onClickLabel = "Apri dettaglio intervento", onClick = onOpen)
-            .padding(horizontal = 15.dp, vertical = 14.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(58.dp).background(appearance.background, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(painterResource(appearance.icon), contentDescription = null, tint = appearance.tint, modifier = Modifier.size(31.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(appearance.label, modifier = Modifier.clip(RoundedCornerShape(18.dp)).background(appearance.background)
-                        .padding(horizontal = 10.dp, vertical = 3.dp), color = appearance.tint,
-                        fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Spacer(Modifier.weight(1f))
-                    Text(String.format(Locale.ITALY, "€ %,.2f", maintenance.cost), fontSize = 16.sp,
-                        fontWeight = FontWeight.Black, maxLines = 1)
-                }
-                Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Icon(painterResource(R.drawable.ic_calendar_nav), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                    Text(dateLabel(maintenance.date), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
-                    Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                    Icon(painterResource(R.drawable.ic_speedometer), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                    Text(maintenance.mileage.formatKm(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
-                }
-                if (maintenance.notes.isNotBlank()) Text(maintenance.notes.lineSequence().first(), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-@Composable internal fun DetailEmptyState(title: String, subtitle: String, icon: Int = R.drawable.ic_document) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(23.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            GradientIcon(icon, 56.dp, 27.dp)
-            Spacer(Modifier.height(9.dp))
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 16.sp, textAlign = TextAlign.Center)
-        }
-    }
+internal fun documentFormat(document: GarageDocument): String = when (document.mimeType) {
+    "application/pdf" -> "PDF"; "image/jpeg" -> "JPG"; "image/png" -> "PNG"
+    else -> document.name.substringAfterLast('.', "FILE").uppercase(Locale.ITALY)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -521,29 +358,35 @@ internal fun documentDate(timestamp: String): String = runCatching {
     onNameChange: (String) -> Unit, onCamera: () -> Unit, onGallery: () -> Unit, onFile: () -> Unit,
     onDismiss: () -> Unit, onSave: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        GarageBackButton("Diario auto", onDismiss)
-        SectionHeading("Documenti", if (existing == null) "Nuovo documento" else "Modifica documento", "Conserva una copia accessibile anche offline.")
-        InfoCard(Modifier.fillMaxWidth()) {
-            Text("Scegli il file", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(5.dp))
-            Text("PDF, immagini e altri file fino a 10 MB. Il documento resta sul dispositivo.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-            Spacer(Modifier.height(15.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCamera, modifier = Modifier.weight(1f)) { Text("Fotocamera", fontSize = 12.sp) }
-                OutlinedButton(onClick = onGallery, modifier = Modifier.weight(1f)) { Text("Galleria", fontSize = 12.sp) }
-            }
-            OutlinedButton(onClick = onFile, modifier = Modifier.fillMaxWidth()) { Text(if (uri == null && existing == null) "Scegli PDF o file" else "Cambia file") }
-            if (uri != null) { Spacer(Modifier.height(8.dp)); Text("File selezionato: ${uri.lastPathSegment?.substringAfterLast('/') ?: "Pronto"}", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-            else if (existing != null) { Spacer(Modifier.height(8.dp)); Text("File attuale: ${existing.name}", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+    EditorScaffold("Documento", if (existing == null) "Nuovo documento" else "Modifica documento", "Conserva una copia accessibile anche offline.", onDismiss, "Salva documento", onSave = onSave) {
+        Overline(if (existing == null) "Scegli il file" else "Sostituisci il file")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SourceTile("Fotocamera", R.drawable.ic_camera, onCamera, Modifier.weight(1f))
+            SourceTile("Galleria", R.drawable.ic_image, onGallery, Modifier.weight(1f))
+            SourceTile("File", R.drawable.ic_folder, onFile, Modifier.weight(1f))
         }
-        OutlinedTextField(name, onNameChange, label = { Text("Nome documento *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Panel(Modifier.fillMaxWidth(), padding = 14.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val picked = uri != null || existing != null
+                if (picked) AccentBadge(R.drawable.ic_document, 40.dp, 20.dp)
+                else TintBadge(R.drawable.ic_document, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.colorScheme.surfaceContainerHigh, 40.dp, 20.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(when { uri != null -> "File selezionato"; existing != null -> "File attuale"; else -> "Nessun file scelto" }, fontWeight = FontWeight.SemiBold)
+                    Text(when { uri != null -> uri.lastPathSegment?.substringAfterLast('/') ?: "Pronto"; existing != null -> existing.name; else -> "PDF, immagini e altri file fino a 10 MB" },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Overline("Dettagli")
+        OutlinedTextField(name, onNameChange, label = { Text("Nome documento *") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
         var interventionsExpanded by remember { mutableStateOf(false) }
         ExposedDropdownMenuBox(expanded = interventionsExpanded, onExpandedChange = { interventionsExpanded = it }) {
             val linked = maintenances.firstOrNull { it.id == linkedMaintenanceId }
             OutlinedTextField(
                 value = linked?.let { "${maintenanceLabel(it)} · ${dateLabel(it.date)}" } ?: "Nessun intervento",
-                onValueChange = {}, readOnly = true, singleLine = true,
+                onValueChange = {}, readOnly = true, singleLine = true, shape = RoundedCornerShape(14.dp),
                 label = { Text("Collega a un intervento (facoltativo)") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(interventionsExpanded) },
                 modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
@@ -559,9 +402,15 @@ internal fun documentDate(timestamp: String): String = runCatching {
             }
         }
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Annulla") }
-            GradientButton(onClick = onSave, modifier = Modifier.weight(1f)) { Text("Salva documento") }
+    }
+}
+
+@Composable private fun SourceTile(label: String, icon: Int, onClick: () -> Unit, modifier: Modifier) {
+    Panel(modifier, padding = 14.dp, onClickLabel = label, onClick = onClick) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }
@@ -578,25 +427,25 @@ internal fun documentDate(timestamp: String): String = runCatching {
     var fuelChoice by remember(existing?.id) { mutableStateOf(existing?.fuel?.let { if (it in fuelOptions || it.isBlank()) it else "Altro" } ?: "") }
     var customFuel by remember(existing?.id) { mutableStateOf(existing?.fuel?.takeIf { it.isNotBlank() && it !in fuelOptions } ?: "") }
     var error by remember(existing?.id) { mutableStateOf("") }
-    Column(
-        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp).padding(top = 17.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp)
-    ) {
-        Column(Modifier.padding(bottom = 10.dp)) {
-            Text("SCHEDA AUTO", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Black)
-            Spacer(Modifier.height(3.dp))
-            Text(if (existing == null) "Nuova auto" else "Modifica auto", fontSize = 33.sp, lineHeight = 36.sp, fontWeight = FontWeight.Black)
-            Spacer(Modifier.height(5.dp))
-            Text("I dettagli della tua auto, sempre a portata di mano.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp, lineHeight = 20.sp)
-        }
+    EditorScaffold("Scheda auto", if (existing == null) "Nuova auto" else "Modifica auto", "I dettagli della tua auto, sempre a portata di mano.", onDismiss, "Salva auto", onSave = {
+        val parsedYear = year.toIntOrNull(); val parsedKm = mileage.toIntOrNull()
+        if (name.isBlank() || make.isBlank() || plate.isBlank() || parsedYear == null || parsedYear !in 1900..LocalDate.now().year || parsedKm == null || parsedKm < 0) { error = "Controlla nome, marca, targa, anno e chilometri"; return@EditorScaffold }
+        val fuel = if (fuelChoice == "Altro") customFuel.trim() else fuelChoice
+        if (fuelChoice == "Altro" && fuel.isBlank()) { error = "Specifica il carburante"; return@EditorScaffold }
+        runCatching { val photo = photoUri?.let { repo.readUri(it, 15 * 1024 * 1024) } ?: existing?.photo
+            onSave((existing ?: Vehicle()).copy(name = name.trim(), make = make.trim(), model = model.trim(), year = parsedYear, plate = plate.trim(), mileage = parsedKm, registrationDate = registration, photo = photo, fuel = fuel, vehicleType = vehicleType, updatedAt = now()))
+        }.onFailure { error = it.message ?: "Foto non leggibile" }
+    }) {
         VehiclePhotoField(photoUri, existing?.photo, pickPhoto)
-        Spacer(Modifier.height(1.dp))
+        Spacer(Modifier.height(4.dp))
+        Overline("Identità")
         VehicleTextField(name, { name = it; error = "" }, "Nome auto *", "Es. La mia auto", R.drawable.ic_car, Modifier.fillMaxWidth())
         VehicleTextField(make, { make = it; error = "" }, "Marca *", "Es. Volkswagen", R.drawable.ic_shield, Modifier.fillMaxWidth())
         VehicleTextField(model, { model = it }, "Modello", "Es. UP", R.drawable.ic_layers, Modifier.fillMaxWidth())
         VehicleSelectionField("Tipo veicolo *", vehicleTypeLabel(vehicleType), "Seleziona tipo", R.drawable.ic_car,
             vehicleTypes.values.toList(), { label -> vehicleType = vehicleTypes.entries.first { it.value == label }.key }, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(4.dp))
+        Overline("Dati tecnici")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VehicleYearField(year, { year = it; error = "" }, Modifier.weight(1f))
             VehicleTextField(mileage, { mileage = it; error = "" }, "Chilometri *", "Es. 0", R.drawable.ic_speedometer, Modifier.weight(1f), "km", KeyboardType.Number)
@@ -607,19 +456,6 @@ internal fun documentDate(timestamp: String): String = runCatching {
         if (fuelChoice == "Altro") VehicleTextField(customFuel, { customFuel = it; error = "" }, "Specifica carburante *", "Es. Benzina/etanolo", R.drawable.ic_fuel, Modifier.fillMaxWidth())
         VehicleRegistrationField(registration, { registration = it })
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 3.dp))
-        Spacer(Modifier.height(4.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("Annulla", fontWeight = FontWeight.SemiBold) }
-            GradientButton(onClick = {
-                val parsedYear = year.toIntOrNull(); val parsedKm = mileage.toIntOrNull()
-                if (name.isBlank() || make.isBlank() || plate.isBlank() || parsedYear == null || parsedYear !in 1900..LocalDate.now().year || parsedKm == null || parsedKm < 0) { error = "Controlla nome, marca, targa, anno e chilometri"; return@GradientButton }
-                val fuel = if (fuelChoice == "Altro") customFuel.trim() else fuelChoice
-                if (fuelChoice == "Altro" && fuel.isBlank()) { error = "Specifica il carburante"; return@GradientButton }
-                runCatching { val photo = photoUri?.let { repo.readUri(it, 15 * 1024 * 1024) } ?: existing?.photo
-                    onSave((existing ?: Vehicle()).copy(name = name.trim(), make = make.trim(), model = model.trim(), year = parsedYear, plate = plate.trim(), mileage = parsedKm, registrationDate = registration, photo = photo, fuel = fuel, vehicleType = vehicleType, updatedAt = now()))
-                }.onFailure { error = it.message ?: "Foto non leggibile" }
-            }, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("Salva auto", fontWeight = FontWeight.Bold) }
-        }
     }
 }
 
@@ -630,30 +466,25 @@ internal fun documentDate(timestamp: String): String = runCatching {
     }.getOrNull() } }
     val hasPhoto = preview != null || existingPhoto != null
     val outline = MaterialTheme.colorScheme.outline.copy(alpha = .35f)
-    val shape = RoundedCornerShape(24.dp)
-    Box(Modifier.fillMaxWidth().height(148.dp).clip(shape).background(MaterialTheme.colorScheme.surface)
+    val shape = RoundedCornerShape(20.dp)
+    Box(Modifier.fillMaxWidth().height(180.dp).clip(shape).background(MaterialTheme.colorScheme.surface)
         .clickable(onClick = onClick).padding(8.dp)
         .drawBehind {
             val width = 1.dp.toPx()
             drawRoundRect(outline, topLeft = Offset(width, width),
                 size = Size(size.width - 2 * width, size.height - 2 * width),
-                cornerRadius = CornerRadius(20.dp.toPx()),
+                cornerRadius = CornerRadius(14.dp.toPx()),
                 style = Stroke(width = width, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))))
         }, contentAlignment = Alignment.Center) {
-        if (preview != null) Image(preview, contentDescription = "Foto auto selezionata", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)), contentScale = ContentScale.Crop)
-        else if (existingPhoto != null) VehicleImage(existingPhoto, Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)))
+        if (preview != null) Image(preview, contentDescription = "Foto auto selezionata", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
+        else if (existingPhoto != null) VehicleImage(existingPhoto, Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)))
         if (hasPhoto) {
             Text("Sostituisci foto", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(18.dp)).padding(horizontal = 15.dp, vertical = 7.dp))
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(62.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(painterResource(R.drawable.ic_car), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(38.dp))
-                    Box(Modifier.align(Alignment.BottomEnd).size(22.dp).background(MaterialTheme.colorScheme.primary, CircleShape), contentAlignment = Alignment.Center) {
-                        Text("+", color = MaterialTheme.colorScheme.onPrimary, fontSize = 20.sp, lineHeight = 20.sp)
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
+                AccentBadge(R.drawable.ic_camera, 56.dp, 28.dp)
+                Spacer(Modifier.height(10.dp))
                 Text("Aggiungi una foto", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 Text("Foto della tua auto (facoltativa)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -665,10 +496,10 @@ internal fun documentDate(timestamp: String): String = runCatching {
     label: String, icon: Int, modifier: Modifier = Modifier, highlighted: Boolean = false,
     onClick: (() -> Unit)? = null, trailing: (@Composable () -> Unit)? = null, content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(14.dp)
     Row(
-        modifier.heightIn(min = 59.dp).clip(shape).background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .32f), shape)
+        modifier.heightIn(min = 60.dp).clip(shape).background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, if (highlighted) MaterialTheme.colorScheme.primary else hairline(), shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -755,7 +586,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
 @Composable private fun VehicleRegistrationField(value: String, onDateSelected: (String) -> Unit) {
     var showPicker by remember { mutableStateOf(false) }
     VehicleFieldFrame("Data di immatricolazione", R.drawable.ic_calendar_nav, Modifier.fillMaxWidth(), onClick = { showPicker = true },
-        trailing = { MaintenanceIcon(R.drawable.ic_calendar_nav) }) {
+        ) {
         Text(if (value.isBlank()) "Seleziona data" else dateLabel(value),
             color = if (value.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             fontSize = 15.sp, maxLines = 1)
@@ -804,133 +635,117 @@ internal fun documentDate(timestamp: String): String = runCatching {
     val accent = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     LaunchedEffect(type) { if (existing == null) { val defaults = mapOf("service" to (1 to "years"), "inspection" to (2 to "years"), "tax" to (1 to "years"), "insurance" to (1 to "years"), "tires" to (6 to "months")); defaults[type]?.let { interval = it.first.toString(); unit = it.second }; reminderEnabled = type != "custom" } }
-    Column(
-        Modifier.fillMaxSize().imePadding().verticalScroll(formScroll)
-            .padding(horizontal = 22.dp).padding(top = 18.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text("INTERVENTI", color = accent, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Black)
-                Spacer(Modifier.height(5.dp))
-                Text(if (existing == null) "Nuovo intervento" else "Modifica intervento", fontSize = 31.sp, lineHeight = 33.sp, fontWeight = FontWeight.Black, maxLines = 2)
-                Spacer(Modifier.height(3.dp))
-                Text(vehicle.name, color = muted, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    EditorScaffold("Intervento", if (existing == null) "Nuovo intervento" else "Modifica intervento", vehicle.name, onDismiss, "Salva intervento", scroll = formScroll,
+        header = {
+            Box(Modifier.size(width = 78.dp, height = 58.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+                VehiclePhoto(vehicle, Modifier.fillMaxSize(), iconSize = 40.dp)
             }
-            Box(Modifier.size(width = 86.dp, height = 67.dp).clip(RoundedCornerShape(17.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-                if (vehicle.photo != null) VehicleImage(vehicle.photo, Modifier.fillMaxSize())
-                else Icon(painterResource(R.drawable.ic_car), contentDescription = null, tint = accent, modifier = Modifier.size(32.dp))
+        },
+        onSave = {
+            val parsedDate = runCatching { LocalDate.parse(date) }.getOrNull()
+            val km = mileage.toIntOrNull()
+            val euro = cost.replace(',', '.').toDoubleOrNull()
+            val due = if (reminderType in listOf("date", "both")) runCatching { LocalDate.parse(dueDate) }.getOrNull() else null
+            val nextKm = threshold.toIntOrNull()
+            val intervalValue = interval.toIntOrNull()
+            if (parsedDate == null || km == null || km < 0 || euro == null || !euro.isFinite() || euro < 0 || (type == "custom" && customName.isBlank())) {
+                error = "Controlla i dati dell'intervento"; return@EditorScaffold
             }
-        }
-        Card(
-            Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(Modifier.padding(14.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Tipo di intervento", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp, bottom = 4.dp))
-                types.chunked(3).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        row.forEach { (key, label, icon) ->
-                            MaintenanceChoice(key == type, label, icon, { type = key }, Modifier.weight(1f))
-                        }
-                    }
+            if (reminderEnabled && ((reminderType in listOf("date", "both") && (due == null || due.isBefore(LocalDate.now()))) ||
+                        (reminderType == "interval" && (intervalValue == null || intervalValue !in 1..24)) ||
+                        (reminderType in listOf("mileage", "both") && (nextKm == null || nextKm <= maxOf(km, vehicle.mileage))))) {
+                error = "Controlla data, intervallo o soglia del promemoria"; return@EditorScaffold
+            }
+            val m = (existing ?: Maintenance(vehicleId = vehicle.id)).copy(type = type, customName = if (type == "custom") customName.trim() else "", date = date, mileage = km, cost = euro, notes = notes.trim(), updatedAt = now())
+            val reminder = if (!reminderEnabled) null else (existingReminder ?: Reminder(maintenanceId = m.id)).copy(
+                type = reminderType,
+                dueDate = when (reminderType) {
+                    "interval" -> (if (unit == "months") parsedDate.plusMonths(intervalValue!!.toLong()) else parsedDate.plusYears(intervalValue!!.toLong())).toString()
+                    "date", "both" -> dueDate
+                    else -> ""
+                },
+                mileageThreshold = if (reminderType in listOf("mileage", "both")) nextKm else null,
+                intervalValue = if (reminderType == "interval") intervalValue else null,
+                intervalUnit = if (reminderType == "interval") unit else "",
+                active = vehicle.status == "active", updatedAt = now()
+            )
+            onSave(m, reminder)
+        }) {
+        Overline("Tipo")
+        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            types.chunked(3).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { (key, label, icon) -> MaintenanceChoice(key == type, label, icon, { type = key }, Modifier.weight(1f)) }
                 }
             }
         }
         if (type == "custom") MaintenanceInput(customName, { customName = it }, "Nome intervento *", R.drawable.ic_edit, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(4.dp))
+        Overline("Dettagli")
         MaintenanceDateField("Data intervento *", date, { date = it })
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             MaintenanceInput(mileage, { mileage = it }, "Chilometri *", R.drawable.ic_speedometer, Modifier.weight(1f), "km", KeyboardType.Number)
-            MaintenanceInput(cost, { cost = it }, "Costo € *", R.drawable.ic_coins, Modifier.weight(1f), "€", KeyboardType.Decimal)
+            MaintenanceInput(cost, { cost = it }, "Costo *", R.drawable.ic_coins, Modifier.weight(1f), "€", KeyboardType.Decimal)
         }
         MaintenanceNotesField(notes, { notes = it })
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .2f))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Promemoria", fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                Text("Imposta un promemoria per questo intervento", color = muted, fontSize = 12.sp)
+        Spacer(Modifier.height(4.dp))
+        Panel(Modifier.fillMaxWidth(), padding = 16.dp) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                AccentBadge(R.drawable.ic_clock, 40.dp, 20.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Promemoria", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Ricordami quando rifarlo", color = muted, fontSize = 13.sp)
+                }
+                Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
             }
-            Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
-        }
-        if (reminderEnabled) {
-            val modes = listOf(
-                Triple("date", "Data", R.drawable.ic_calendar_nav),
-                Triple("interval", "Intervallo", R.drawable.ic_repeat),
-                Triple("mileage", "Km", R.drawable.ic_speedometer),
-                Triple("both", "Entrambi", R.drawable.ic_coins)
-            )
-            Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                modes.forEach { (key, label, icon) -> MaintenanceChoice(key == reminderType, label, icon, { reminderType = key }, Modifier.weight(1f), compact = true) }
+            AnimatedVisibility(reminderEnabled) {
+                Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val modes = listOf(
+                        Triple("date", "Data", R.drawable.ic_calendar_nav),
+                        Triple("interval", "Intervallo", R.drawable.ic_repeat),
+                        Triple("mileage", "Km", R.drawable.ic_speedometer),
+                        Triple("both", "Data e km", R.drawable.ic_layers)
+                    )
+                    Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        modes.forEach { (key, label, icon) -> MaintenanceChoice(key == reminderType, label, icon, { reminderType = key }, Modifier.weight(1f), compact = true) }
+                    }
+                    if (reminderType == "date" || reminderType == "both") MaintenanceDateField("Data di scadenza *", dueDate, { dueDate = it })
+                    if (reminderType == "interval") MaintenanceIntervalPicker(
+                        interval.toIntOrNull() ?: 1, unit,
+                        onIntervalChange = { interval = it.toString() }, onUnitChange = { unit = it },
+                        date = date
+                    )
+                    if (reminderType == "mileage" || reminderType == "both") MaintenanceInput(threshold, { threshold = it }, "Soglia chilometrica *", R.drawable.ic_speedometer, Modifier.fillMaxWidth(), "km", KeyboardType.Number,
+                        onFocusChange = { thresholdFocused = it })
+                }
             }
-            if (reminderType == "date" || reminderType == "both") MaintenanceDateField("Data di scadenza *", dueDate, { dueDate = it })
-            if (reminderType == "interval") MaintenanceIntervalPicker(
-                interval.toIntOrNull() ?: 1, unit,
-                onIntervalChange = { interval = it.toString() }, onUnitChange = { unit = it },
-                date = date
-            )
-            if (reminderType == "mileage" || reminderType == "both") MaintenanceInput(threshold, { threshold = it }, "Soglia chilometrica *", R.drawable.ic_speedometer, Modifier.fillMaxWidth(), "km", KeyboardType.Number,
-                onFocusChange = { thresholdFocused = it })
         }
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
-        Spacer(Modifier.height(2.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("Annulla", fontWeight = FontWeight.SemiBold) }
-            GradientButton(onClick = {
-                val parsedDate = runCatching { LocalDate.parse(date) }.getOrNull()
-                val km = mileage.toIntOrNull()
-                val euro = cost.replace(',', '.').toDoubleOrNull()
-                val due = if (reminderType in listOf("date", "both")) runCatching { LocalDate.parse(dueDate) }.getOrNull() else null
-                val nextKm = threshold.toIntOrNull()
-                val intervalValue = interval.toIntOrNull()
-                if (parsedDate == null || km == null || km < 0 || euro == null || !euro.isFinite() || euro < 0 || (type == "custom" && customName.isBlank())) {
-                    error = "Controlla i dati dell'intervento"; return@GradientButton
-                }
-                if (reminderEnabled && ((reminderType in listOf("date", "both") && (due == null || due.isBefore(LocalDate.now()))) ||
-                            (reminderType == "interval" && (intervalValue == null || intervalValue !in 1..24)) ||
-                            (reminderType in listOf("mileage", "both") && (nextKm == null || nextKm <= maxOf(km, vehicle.mileage))))) {
-                    error = "Controlla data, intervallo o soglia del promemoria"; return@GradientButton
-                }
-                val m = (existing ?: Maintenance(vehicleId = vehicle.id)).copy(type = type, customName = if (type == "custom") customName.trim() else "", date = date, mileage = km, cost = euro, notes = notes.trim(), updatedAt = now())
-                val reminder = if (!reminderEnabled) null else (existingReminder ?: Reminder(maintenanceId = m.id)).copy(
-                    type = reminderType,
-                    dueDate = when (reminderType) {
-                        "interval" -> (if (unit == "months") parsedDate.plusMonths(intervalValue!!.toLong()) else parsedDate.plusYears(intervalValue!!.toLong())).toString()
-                        "date", "both" -> dueDate
-                        else -> ""
-                    },
-                    mileageThreshold = if (reminderType in listOf("mileage", "both")) nextKm else null,
-                    intervalValue = if (reminderType == "interval") intervalValue else null,
-                    intervalUnit = if (reminderType == "interval") unit else "",
-                    active = vehicle.status == "active", updatedAt = now()
-                )
-                onSave(m, reminder)
-            }, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(28.dp)) { Text("Salva intervento", fontWeight = FontWeight.Bold, maxLines = 1, fontSize = 13.sp) }
-        }
     }
 }
 
 @Composable private fun MaintenanceChoice(selected: Boolean, label: String, icon: Int, onClick: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
-    val shape = RoundedCornerShape(13.dp)
+    val shape = RoundedCornerShape(14.dp)
     val accent = MaterialTheme.colorScheme.primary
-    Row(
-        modifier.height(if (compact) 48.dp else 53.dp).clip(shape)
-            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
-            .border(1.dp, if (selected) accent else MaterialTheme.colorScheme.outline.copy(alpha = .43f), shape)
+    val bg by animateColorAsState(if (selected) accent.copy(alpha = .14f) else MaterialTheme.colorScheme.surface, tween(200), label = "choice_bg")
+    Column(
+        modifier.height(if (compact) 58.dp else 70.dp).clip(shape).background(bg)
+            .border(1.dp, if (selected) accent else hairline(), shape)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = if (compact) 5.dp else 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+            .padding(horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Icon(painterResource(icon), contentDescription = null, tint = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(if (compact) 18.dp else 19.dp))
-        Spacer(Modifier.width(if (compact) 4.dp else 3.dp))
-        Text(label, fontSize = 10.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Icon(painterResource(icon), contentDescription = null, tint = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(if (compact) 19.dp else 22.dp))
+        Spacer(Modifier.height(5.dp))
+        Text(label, fontSize = if (compact) 11.sp else 12.sp, color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable private fun MaintenanceIcon(icon: Int) {
-    Box(Modifier.size(34.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape), contentAlignment = Alignment.Center) {
-        Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
-    }
+    AccentBadge(icon, 34.dp, 18.dp)
 }
 
 @Composable private fun MaintenanceInput(
@@ -951,23 +766,23 @@ internal fun documentDate(timestamp: String): String = runCatching {
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surface,
             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = .43f)
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = .3f)
         )
     )
 }
 
 @Composable private fun MaintenanceNotesField(value: String, onValueChange: (String) -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(14.dp)
     val requester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
     Row(
         Modifier.fillMaxWidth().height(96.dp).bringIntoViewRequester(requester).clip(shape).background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .43f), shape)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .3f), shape)
             .padding(horizontal = 12.dp, vertical = 13.dp),
         verticalAlignment = Alignment.Top
     ) {
@@ -998,10 +813,10 @@ internal fun documentDate(timestamp: String): String = runCatching {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun MaintenanceDateField(label: String, value: String, onDateSelected: (String) -> Unit) {
     var showPicker by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(14.dp)
     Row(
         Modifier.fillMaxWidth().height(66.dp).clip(shape).background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .43f), shape)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .3f), shape)
             .clickable { showPicker = true }.padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1011,7 +826,6 @@ internal fun documentDate(timestamp: String): String = runCatching {
             Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             Text(if (value.isBlank()) "Seleziona data" else dateLabel(value), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
-        MaintenanceIcon(R.drawable.ic_calendar_nav)
     }
     if (showPicker) {
         val initial = runCatching { LocalDate.parse(value) }.getOrDefault(LocalDate.now()).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
@@ -1033,7 +847,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
     }.getOrNull()
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .43f), RoundedCornerShape(18.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .3f), RoundedCornerShape(18.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1060,7 +874,7 @@ internal fun documentDate(timestamp: String): String = runCatching {
     Box(
         Modifier.height(56.dp).widthIn(min = 50.dp).clip(shape)
             .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .43f), shape)
+            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .3f), shape)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(horizontal = 9.dp),
         contentAlignment = Alignment.Center
     ) { Text(label, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) }
