@@ -29,6 +29,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -230,13 +231,14 @@ import java.util.Locale
     sharedTransitionScope: SharedTransitionScope?, animatedVisibilityScope: AnimatedVisibilityScope?, parallax: () -> Float,
 ) {
     val statusLabel = when (v.status) { "sold" -> "Venduta"; "scrapped" -> "Rottamata"; else -> "" }
-    Box(Modifier.fillMaxWidth().height(400.dp)) {
+    // Clipped: with the parallax the photo slides down, and its edge must not show below the fade.
+    Box(Modifier.fillMaxWidth().height(400.dp).clipToBounds()) {
         val photoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) with(sharedTransitionScope) {
             Modifier.sharedElement(rememberSharedContentState("vehicle-photo-${v.id}"), animatedVisibilityScope,
                 boundsTransform = { _, _ -> tween(420, easing = FastOutSlowInEasing) })
         } else Modifier
         Box(Modifier.matchParentSize().then(photoModifier).graphicsLayer { translationY = parallax() * .4f }) {
-            VehiclePhoto(v, Modifier.fillMaxSize(), iconSize = 190.dp)
+            VehiclePhoto(v, Modifier.fillMaxSize())
         }
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(
             0f to Color.Black.copy(alpha = .5f), .22f to Color.Transparent, .5f to Color.Transparent,

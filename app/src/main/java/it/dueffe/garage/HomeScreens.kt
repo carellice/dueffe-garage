@@ -76,24 +76,44 @@ import kotlin.math.absoluteValue
     }
 }
 
+/** Decoded car photos, shared by every screen: decoding a full photo on open made the page stutter. */
+private val photoCache = android.util.LruCache<Int, androidx.compose.ui.graphics.ImageBitmap>(12)
+
+/** Decodes [data] scaled down to about [maxPixels] on the longer side. */
+private fun decodePhoto(data: ByteArray, maxPixels: Int = 1440): androidx.compose.ui.graphics.ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxPixels) sample *= 2
+    return BitmapFactory.decodeByteArray(data, 0, data.size, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+}
+
 @Composable internal fun VehicleImage(data: ByteArray?, modifier: Modifier = Modifier) {
-    val bitmap = remember(data) { data?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() } }
-    if (bitmap != null) Image(BitmapPainter(bitmap), contentDescription = "Foto auto", modifier = modifier, contentScale = ContentScale.Crop)
+    val key = remember(data) { data?.contentHashCode() }
+    // Cached photos draw on the first frame; new ones decode off the main thread.
+    val bitmap by produceState(key?.let { photoCache.get(it) }, key) {
+        if (data != null && key != null && value == null) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { decodePhoto(data) }.getOrNull()?.also { photoCache.put(key, it) }
+        }
+    }
+    bitmap?.let { Image(BitmapPainter(it), contentDescription = "Foto auto", modifier = modifier, contentScale = ContentScale.Crop) }
 }
 
 /** The car photo, or a carbon backdrop with the outline of the car when there is none. */
-@Composable internal fun VehiclePhoto(v: Vehicle, modifier: Modifier = Modifier, iconSize: Dp = 140.dp) {
+@Composable internal fun VehiclePhoto(v: Vehicle, modifier: Modifier = Modifier) {
     Box(modifier) {
         if (v.photo != null) VehicleImage(v.photo, Modifier.fillMaxSize())
         else {
             val accent = Ice
-            Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF1A2230), Color(0xFF07090C))))
+            BoxWithConstraints(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF1A2230), Color(0xFF07090C))))
                 .drawBehind {
                     val c = Offset(size.width * .78f, size.height * .25f)
                     drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = .22f), Color.Transparent), c, size.width * .55f), size.width * .55f, c)
                 }) {
+                // Sized from the box, so it grows smoothly with the photo transition instead of jumping.
+                val iconSize = minOf(maxWidth * .45f, maxHeight * .55f)
                 Icon(painterResource(R.drawable.ic_car), contentDescription = null, tint = Color.White.copy(alpha = .14f),
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 18.dp).size(iconSize).rotate(-6f))
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = iconSize * .12f).size(iconSize).rotate(-6f))
             }
         }
     }
@@ -306,7 +326,7 @@ private var homeIntroPlayed = false
 
 @Composable private fun ArchivedRow(v: Vehicle, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().bouncyClick(onClickLabel = "Apri ${v.name}", onClick = onClick).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        VehiclePhoto(v, Modifier.size(width = 60.dp, height = 44.dp).clip(RoundedCornerShape(10.dp)), iconSize = 34.dp)
+        VehiclePhoto(v, Modifier.size(width = 60.dp, height = 44.dp).clip(RoundedCornerShape(10.dp)))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(v.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)

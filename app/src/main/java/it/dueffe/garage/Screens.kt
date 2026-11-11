@@ -638,7 +638,7 @@ internal fun documentFormat(document: GarageDocument): String = when (document.m
     EditorScaffold("Intervento", if (existing == null) "Nuovo intervento" else "Modifica intervento", vehicle.name, onDismiss, "Salva intervento", scroll = formScroll,
         header = {
             Box(Modifier.size(width = 78.dp, height = 58.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-                VehiclePhoto(vehicle, Modifier.fillMaxSize(), iconSize = 40.dp)
+                VehiclePhoto(vehicle, Modifier.fillMaxSize())
             }
         },
         onSave = {
