@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Bouncy, Divider, GlassCard, GradientButton, GradientIcon, Icon, OutlinedButton, SectionHeading, Slider, Stagger, Switch, useGradient } from '../components/ui.tsx'
+import { AccentBadge, Bouncy, Icon, Overline, PageHeading, PageTopBar, Panel, RowDivider, Slider, Stagger, Switch, TintBadge } from '../components/ui.tsx'
 import { Dialog, DialogButton, toast } from '../components/overlays.tsx'
 import { OutlinedField } from '../components/fields.tsx'
 import { ConfirmDelete, PinSetupDialog } from '../components/dialogs.tsx'
@@ -10,6 +10,7 @@ import { deviceLockAvailable, registerDeviceLock } from '../lib/deviceLock.ts'
 import { setPin, verifyPin } from '../lib/pin.ts'
 import { download, pickFile } from '../lib/files.ts'
 import { lockNow } from '../lib/lock.ts'
+import { back } from '../lib/nav.ts'
 import type { IconName } from '../lib/icons.gen.ts'
 import { todayString } from '../../../shared/format.ts'
 
@@ -25,7 +26,6 @@ export function Settings({ onOnboarding, version }: { onOnboarding: () => void; 
   const [importing, setImporting] = useState<{ text: string; summary: string } | null>(null)
   const [account, setAccount] = useState<null | 'password' | 'delete'>(null)
   useEffect(() => { deviceLockAvailable().then(setBiometricAvailable) }, [])
-  const muted = 'var(--onSurfaceVariant)'
   const hasPin = !!settings.pinHash
 
   const backupStatus = !data.lastExport ? 'Nessun backup esportato' : data.lastChange > data.lastExport ? 'Un nuovo backup è consigliato' : 'Backup aggiornato'
@@ -77,60 +77,64 @@ export function Settings({ onOnboarding, version }: { onOnboarding: () => void; 
   }
 
   return (
-    <div className="scroll status-pad">
-      <div style={{ padding: '22px 18px 120px', display: 'flex', flexDirection: 'column', gap: 15 }}>
-        <SectionHeading kicker="Garage" title="Impostazioni" subtitle="Il tuo spazio, come piace a te." />
-        <Panel icon="settingsNav" title="Aspetto" subtitle="Scegli come vedere il tuo garage" index={1}>
+    <div className="scroll">
+      <PageTopBar onBack={() => back()} backLabel="Garage" />
+      <div style={{ padding: '0 18px 40px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <Stagger index={0} style={{ padding: '0 2px' }}><PageHeading overline="Garage" title="Impostazioni" subtitle="Il tuo spazio, come piace a te." /></Stagger>
+        <Group title="Aspetto" index={1}>
           <ThemePicker theme={settings.theme} onChange={(theme) => updateSettings({ theme })} />
-        </Panel>
-        <Panel icon="calendarNav" title="Scadenze" subtitle="Promemoria per arrivare sempre in tempo" index={2}>
-          <SwitchRow title="Notifiche" subtitle={pushSupported() ? 'Avvisami delle prossime scadenze' : 'Apri Garage in HTTPS e installala come app'}
+        </Group>
+        <Group title="Scadenze" index={2}>
+          <SwitchRow icon="calendarNav" title="Notifiche" subtitle={pushSupported() ? 'Avvisami delle prossime scadenze' : 'Apri Garage in HTTPS e installala come app'}
             checked={settings.remindersEnabled} onChange={onNotifications} />
-          <Line />
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600 }}>Preavviso</span>
-            <span style={{ flex: 1 }} />
-            <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{`${leadDays} giorni`}</span>
-          </div>
-          <Slider value={leadDays} min={1} max={30} enabled={settings.remindersEnabled}
-            onChange={(v) => setLeadDays(Math.min(30, Math.max(1, Math.trunc(v))))} />
-          <SaveLeadDays value={leadDays} saved={data.leadDays} />
-        </Panel>
-        <Panel icon="shield" title="Privacy e accesso" subtitle="I tuoi dati restano nelle tue mani" index={3}>
-          <SwitchRow title="Proteggi Garage" subtitle="Richiedi il PIN all'apertura" checked={settings.protection} onChange={onProtection} />
-          {settings.protection && <>
-            <Line />
-            <SwitchRow title="Biometria" subtitle={biometricAvailable ? 'Usa impronta o volto' : 'Non disponibile su questo dispositivo'}
-              checked={!!settings.lockCredential} onChange={onBiometric} enabled={biometricAvailable && hasPin} />
-            <Action label="Cambia PIN" icon="edit" onClick={() => setPinSetup({ enablesProtection: false })} />
-            <Action label="Blocca adesso" icon="shield" onClick={lockNow} />
+          {settings.remindersEnabled && <>
+            <RowDivider />
+            <div style={{ padding: '12px 16px 6px 72px' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ flex: 1, fontWeight: 500 }}>Preavviso</span>
+                <span className="tnum" style={{ color: 'var(--primary)', fontWeight: 700 }}>{`${leadDays} ${leadDays === 1 ? 'giorno' : 'giorni'}`}</span>
+              </div>
+              <Slider value={leadDays} min={1} max={30} onChange={(v) => setLeadDays(Math.min(30, Math.max(1, Math.trunc(v))))} />
+            </div>
           </>}
-          <div style={{ color: muted, fontSize: 12, lineHeight: '17px', letterSpacing: 0.4 }}>Il blocco protegge l'accesso all'app; i backup esportati non sono cifrati.</div>
-        </Panel>
-        <Panel icon="folder" title="I tuoi dati" subtitle="Esporta o ripristina il tuo archivio" index={4}>
-          <div style={{ color: 'var(--primary)', fontWeight: 600, fontSize: 13, lineHeight: '20px', letterSpacing: 0.25 }}>{backupStatus}</div>
-          <GradientButton onClick={exportBackup} height={48} radius={24}><span style={{ fontWeight: 700 }}>Esporta backup</span></GradientButton>
-          <OutlinedButton onClick={importBackup} height={48} radius={24}>Importa backup</OutlinedButton>
-          <div style={{ color: muted, fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>Il file include foto e documenti e non è cifrato. È lo stesso formato dell'app Android.</div>
-        </Panel>
-        <Panel icon="note" title="Garage" subtitle="L'archivio è sul tuo server, anche offline" index={5}>
-          <Action label="Rivedi l'introduzione" icon="chevronRight" onClick={onOnboarding} />
-        </Panel>
-        <Panel icon="shield" title="Account" subtitle={`Sei entrato come ${loggedUser()}`} index={6}>
-          <Action label="Cambia password" icon="edit" onClick={() => setAccount('password')} />
-          <Action label="Esci" icon="arrowBack" onClick={async () => {
+          <SaveLeadDays value={leadDays} saved={data.leadDays} />
+        </Group>
+        <Group title="Privacy e accesso" index={3} footer="Il blocco protegge l'accesso all'app; i backup esportati non sono cifrati.">
+          <SwitchRow icon="shield" title="Proteggi Garage" subtitle="Richiedi il PIN all'apertura" checked={settings.protection} onChange={onProtection} />
+          {settings.protection && <>
+            <RowDivider />
+            <SwitchRow icon="settingsNav" title="Biometria" subtitle={biometricAvailable ? 'Usa impronta o volto' : 'Non disponibile su questo dispositivo'}
+              checked={!!settings.lockCredential} onChange={onBiometric} enabled={biometricAvailable && hasPin} />
+            <RowDivider />
+            <ActionRow icon="edit" title="Cambia PIN" onClick={() => setPinSetup({ enablesProtection: false })} />
+            <RowDivider />
+            <ActionRow icon="shield" title="Blocca adesso" onClick={lockNow} />
+          </>}
+        </Group>
+        <Group title="I tuoi dati" index={4} footer="Il file include foto e documenti e non è cifrato. È lo stesso formato dell'app Android.">
+          <ActionRow icon="share" title="Esporta backup" subtitle={backupStatus} onClick={exportBackup} />
+          <RowDivider />
+          <ActionRow icon="folder" title="Importa backup" subtitle="Sostituisce i dati di questo account" onClick={importBackup} />
+        </Group>
+        <Group title="Account" index={5}>
+          <ActionRow icon="licensePlate" title="Cambia password" subtitle={`Sei entrato come ${loggedUser()}`} onClick={() => setAccount('password')} />
+          <RowDivider />
+          <ActionRow icon="arrowBack" title="Esci" onClick={async () => {
             await disablePush()
             await api('/api/logout', { method: 'POST' }).catch(() => {})
             location.reload()
           }} />
-          <Action label="Elimina account" icon="delete" onClick={() => setAccount('delete')} destructive />
-        </Panel>
-        <Stagger index={7}>
-          <OutlinedButton onClick={() => setClearConfirm(true)} height={50} radius={25} color="var(--error)">
-            <Icon name="delete" size={18} /><span style={{ width: 8 }} />Elimina tutti i dati
-          </OutlinedButton>
-        </Stagger>
-        <UpdateCard version={version} />
+        </Group>
+        <Group title="App" index={6}>
+          <ActionRow icon="note" title="Rivedi l'introduzione" onClick={onOnboarding} />
+          <RowDivider />
+          <UpdateRow version={version} />
+        </Group>
+        <Group title="Zona pericolosa" index={7}>
+          <ActionRow icon="delete" title="Elimina tutti i dati" subtitle="Auto, interventi e documenti" destructive onClick={() => setClearConfirm(true)} />
+          <RowDivider />
+          <ActionRow icon="delete" title="Elimina account" subtitle="L'account e tutti i suoi dati" destructive onClick={() => setAccount('delete')} />
+        </Group>
       </div>
       <ConfirmDelete text={clearConfirm ? 'Eliminare definitivamente auto, interventi e documenti?' : null} onDismiss={() => setClearConfirm(false)}
         onConfirm={() => { setClearConfirm(false); actions.clear().then(() => toast('Dati eliminati')).catch((e: Error) => toast(e.message, true)) }} />
@@ -165,83 +169,73 @@ function SaveLeadDays({ value, saved }: { value: number; saved: number }) {
   return null
 }
 
-function Panel({ icon, title, subtitle, index, children }: { icon: IconName; title: string; subtitle: string; index: number; children: ReactNode }) {
+function Group({ title, index, footer, children }: { title: string; index: number; footer?: string; children: ReactNode }) {
   return (
     <Stagger index={index}>
-      <GlassCard padding={0}>
-        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 13 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <GradientIcon icon={icon} size={46} iconSize={22} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 20, lineHeight: '28px', fontWeight: 700 }}>{title}</div>
-              <div style={{ color: 'var(--onSurfaceVariant)', fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>{subtitle}</div>
-            </div>
-          </div>
-          <Divider style={{ background: 'color-mix(in srgb, var(--outline) 16%, transparent)' }} />
-          {children}
-        </div>
-      </GlassCard>
+      <Overline text={title} style={{ padding: '0 4px 8px' }} />
+      <Panel padding={0} style={{ overflow: 'hidden' }}>{children}</Panel>
+      {footer && <div style={{ color: 'var(--onSurfaceVariant)', fontSize: 12, lineHeight: '17px', padding: '8px 4px 0' }}>{footer}</div>}
     </Stagger>
   )
 }
 
-const Line = () => <Divider style={{ background: 'color-mix(in srgb, var(--outline) 18%, transparent)' }} />
-
 function ThemePicker({ theme, onChange }: { theme: ThemeMode; onChange: (t: ThemeMode) => void }) {
-  const options: [ThemeMode, string, IconName][] = [['SYSTEM', 'Sistema', 'settingsNav'], ['LIGHT', 'Chiaro', 'calendarNav'], ['DARK', 'Scuro', 'garageNav']]
+  const options: [ThemeMode, string][] = [['SYSTEM', 'Automatico'], ['LIGHT', 'Chiaro'], ['DARK', 'Scuro']]
   return (
-    <div style={{ display: 'flex', gap: 4, borderRadius: 20, background: 'var(--surfaceContainer)', padding: 4 }}>
-      {options.map(([key, label, icon]) => <ThemeOption key={key} selected={theme === key} label={label} icon={icon} onClick={() => onChange(key)} />)}
+    <div style={{ margin: 12, display: 'flex', gap: 4, borderRadius: 14, background: 'var(--surfaceContainerHigh)', padding: 4 }}>
+      {options.map(([key, label]) => {
+        const selected = theme === key
+        return (
+          <Bouncy key={key} role="radio" onClick={() => onChange(key)} ripple={selected ? 'var(--onAccent)' : 'currentColor'} style={{
+            flex: 1, borderRadius: 11, padding: '11px 0', textAlign: 'center', fontSize: 13, fontWeight: selected ? 700 : 500,
+            background: selected ? 'var(--primary)' : 'transparent', color: selected ? 'var(--onAccent)' : 'var(--onSurfaceVariant)', transition: 'background-color 220ms, color 220ms',
+          }}>{label}</Bouncy>
+        )
+      })}
     </div>
   )
 }
 
-function ThemeOption({ selected, label, icon, onClick }: { selected: boolean; label: string; icon: IconName; onClick: () => void }) {
-  const ref = useGradient<HTMLDivElement>()
-  const color = selected ? 'var(--onAccent)' : 'var(--onSurfaceVariant)'
+function SwitchRow({ icon, title, subtitle, checked, onChange, enabled = true }: { icon: IconName; title: string; subtitle: string; checked: boolean; onChange: (v: boolean) => void; enabled?: boolean }) {
   return (
-    <Bouncy ref={ref} onClick={onClick} className={selected ? 'accent-bg' : ''} style={{ flex: 1, borderRadius: 17, padding: '12px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Icon name={icon} size={16} color={color} />
-      <span style={{ width: 5 }} />
-      <span style={{ color, fontSize: 12, lineHeight: '16px', letterSpacing: 0.5, fontWeight: selected ? 700 : 500 }}>{label}</span>
-    </Bouncy>
-  )
-}
-
-function SwitchRow({ title, subtitle, checked, onChange, enabled = true }: { title: string; subtitle: string; checked: boolean; onChange: (v: boolean) => void; enabled?: boolean }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px' }}>
+      <AccentBadge icon={icon} size={42} iconSize={20} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600 }}>{title}</div>
-        <div style={{ color: 'var(--onSurfaceVariant)', fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>{subtitle}</div>
+        <div style={{ color: 'var(--onSurfaceVariant)', fontSize: 13, lineHeight: '18px' }}>{subtitle}</div>
       </div>
-      <span style={{ width: 8 }} />
       <Switch checked={checked} onChange={onChange} enabled={enabled} />
     </div>
   )
 }
 
-function Action({ label, icon, onClick, destructive = false }: { label: string; icon: IconName; onClick: () => void; destructive?: boolean }) {
-  const color = destructive ? 'var(--error)' : 'var(--primary)'
+function ActionRow({ icon, title, subtitle, onClick, destructive = false }: { icon: IconName; title: string; subtitle?: string; onClick: () => void; destructive?: boolean }) {
   return (
-    <Bouncy onClick={onClick} style={{ borderRadius: 15, padding: '7px 0', display: 'flex', alignItems: 'center' }}>
-      <Icon name={icon} size={20} color={color} />
-      <span style={{ width: 10 }} />
-      <span style={{ flex: 1, color, fontWeight: 600 }}>{label}</span>
+    <Bouncy onClick={onClick} label={title} pressed={0.985} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px' }}>
+      {destructive ? <TintBadge icon={icon} tint="var(--error)" background="color-mix(in srgb, var(--error) 12%, transparent)" size={42} iconSize={20} /> : <AccentBadge icon={icon} size={42} iconSize={20} />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, color: destructive ? 'var(--error)' : 'var(--onSurface)' }}>{title}</div>
+        {subtitle && <div className="ellipsis" style={{ color: 'var(--onSurfaceVariant)', fontSize: 13, lineHeight: '18px' }}>{subtitle}</div>}
+      </div>
       <Icon name="chevronRight" size={18} color="var(--onSurfaceVariant)" />
     </Bouncy>
   )
 }
 
 /** Replaces the native in-app APK updater: the web app updates itself from the server. */
-function UpdateCard({ version }: { version: string }) {
+function UpdateRow({ version }: { version: string }) {
   const [status, setStatus] = useState('')
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null)
   const check = async () => {
+    if (waiting) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => location.reload())
+      waiting.postMessage('skipWaiting')
+      return
+    }
     setStatus('Controllo in corso…')
     try {
       const registration = await navigator.serviceWorker?.getRegistration()
-      if (!registration) { setStatus('Aggiornamenti automatici: Garage si aggiorna da sola'); return }
+      if (!registration) { setStatus('Garage si aggiorna da sola'); return }
       await registration.update()
       await new Promise((r) => setTimeout(r, 1500))
       if (registration.waiting) { setWaiting(registration.waiting); setStatus('Nuova versione disponibile: tocca per aggiornare') }
@@ -250,29 +244,7 @@ function UpdateCard({ version }: { version: string }) {
       setStatus('Server non raggiungibile')
     }
   }
-  return (
-    <Stagger index={8}>
-      <GlassCard>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <GradientIcon icon="repeat" size={46} iconSize={22} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 20, lineHeight: '28px', fontWeight: 700 }}>Aggiornamenti</div>
-            <div style={{ color: 'var(--onSurfaceVariant)', fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>{`Versione ${version || '—'} · aggiornata ogni notte dal server`}</div>
-          </div>
-        </div>
-        <div style={{ height: 13 }} />
-        {waiting ? (
-          <GradientButton onClick={() => {
-            navigator.serviceWorker.addEventListener('controllerchange', () => location.reload())
-            waiting.postMessage('skipWaiting')
-          }} height={48} radius={24}><span style={{ fontWeight: 700 }}>Aggiorna adesso</span></GradientButton>
-        ) : (
-          <OutlinedButton onClick={check} height={48} radius={24}>Controlla aggiornamenti</OutlinedButton>
-        )}
-        {status && <div style={{ color: 'var(--onSurfaceVariant)', fontSize: 12, lineHeight: '16px', paddingTop: 8 }}>{status}</div>}
-      </GlassCard>
-    </Stagger>
-  )
+  return <ActionRow icon="repeat" title={waiting ? 'Aggiorna adesso' : 'Controlla aggiornamenti'} subtitle={status || `Versione ${version || '—'} · aggiornata ogni notte dal server`} onClick={check} />
 }
 
 function AccountDialogs({ mode, onDismiss }: { mode: null | 'password' | 'delete'; onDismiss: () => void }) {

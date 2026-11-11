@@ -1,9 +1,9 @@
 import { animate, motion, useMotionValue } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
-import { Bouncy, TextButton } from '../components/ui.tsx'
+import { Bouncy, Gauge, TextButton } from '../components/ui.tsx'
 import { Backdrop } from '../components/garage.tsx'
-import { fastOutSlowIn, spring, Stiffness } from '../components/motion.ts'
-import { Gold, alpha, useDark } from '../lib/theme.ts'
+import { spring, Stiffness } from '../components/motion.ts'
+import { useDark } from '../lib/theme.ts'
 import { useStore } from '../lib/store.ts'
 import { verifyPin } from '../lib/pin.ts'
 import { unlockWithDevice } from '../lib/deviceLock.ts'
@@ -59,13 +59,11 @@ export function Lock() {
     <div className="layer">
       <Backdrop />
       <div className="status-pad nav-pad" style={{ position: 'absolute', inset: 0, padding: '0 26px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: 110, height: 110, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <motion.div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `radial-gradient(closest-side, ${alpha(Gold, 0.35)}, transparent)` }}
-            initial={{ scale: 0.9 }} animate={{ scale: 1.08 }} transition={{ duration: 1.8, ease: fastOutSlowIn, repeat: Infinity, repeatType: 'reverse' }} />
-          <img src={dark ? '/garage_logo_dark.png' : '/garage_logo_light.png'} alt="Garage" style={{ width: 74, height: 74, position: 'relative' }} />
-        </div>
-        <div style={{ height: 14 }} />
-        <div style={{ color: 'var(--onBackground)', fontSize: 31, lineHeight: '36px', fontWeight: 900, letterSpacing: -0.5 }}>Garage protetto</div>
+        <Gauge fraction={pin.length / (pinLength || 6)} color="var(--primary)" size={108} stroke={4}>
+          <img src={dark ? '/garage_logo_dark.png' : '/garage_logo_light.png'} alt="Garage" style={{ width: 60, height: 60 }} />
+        </Gauge>
+        <div style={{ height: 18 }} />
+        <div style={{ color: 'var(--onBackground)', fontSize: 28, lineHeight: '34px', fontWeight: 700, letterSpacing: -0.6 }}>Garage protetto</div>
         <div style={{ height: 5 }} />
         <div style={{ color: 'var(--onSurfaceVariant)' }}>Inserisci il tuo PIN</div>
         <div style={{ height: 25 }} />
@@ -73,8 +71,8 @@ export function Lock() {
           {Array.from({ length: pinLength || 6 }, (_, index) => {
             const filled = index < pin.length
             return (
-              <motion.div key={index} className={filled ? 'accent-bg' : ''} initial={false} animate={{ scale: filled ? 1.25 : 1 }} transition={spring(0.35, Stiffness.Medium)}
-                style={{ width: 13, height: 13, borderRadius: '50%', background: filled ? undefined : 'color-mix(in srgb, var(--outline) 40%, transparent)' }} />
+              <motion.div key={index} initial={false} animate={{ scale: filled ? 1.2 : 1 }} transition={spring(0.4, Stiffness.Medium)}
+                style={{ width: 12, height: 12, borderRadius: '50%', background: filled ? 'var(--primary)' : 'color-mix(in srgb, var(--outline) 35%, transparent)' }} />
             )
           })}
         </motion.div>
@@ -88,7 +86,7 @@ export function Lock() {
         ))}
         <div style={{ width: '100%', display: 'flex', justifyContent: 'space-evenly', alignItems: 'center' }}>
           <div style={{ width: 70, height: 70, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {biometric && <TextButton onClick={tryBiometric} style={{ fontSize: 13, fontWeight: 700 }}>Bio</TextButton>}
+            {biometric && <TextButton onClick={tryBiometric} style={{ fontSize: 12, fontWeight: 700 }}>Biometria</TextButton>}
           </div>
           <Key label="0" onClick={() => digit(0)} />
           <Key label="⌫" onClick={() => { if (pin) { setPin(pin.slice(0, -1)); setError('') } }} />
@@ -99,11 +97,10 @@ export function Lock() {
 }
 
 function Key({ label, onClick }: { label: string; onClick: () => void }) {
-  const dark = useDark()
   return (
     <Bouncy onClick={onClick} label={label === '⌫' ? 'Cancella cifra' : `Cifra ${label}`} style={{
-      width: 70, height: 70, borderRadius: '50%', background: 'var(--surface)', border: `1px solid ${dark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.06)'}`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--onSurface)', fontSize: 28, lineHeight: '36px', fontWeight: 600,
+      width: 72, height: 72, borderRadius: '50%', background: 'var(--surface)', border: '1px solid var(--hairline)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--onSurface)', fontSize: 26, lineHeight: '36px', fontWeight: 500, fontVariantNumeric: 'tabular-nums',
     }}>{label}</Bouncy>
   )
 }

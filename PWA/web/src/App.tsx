@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { Backdrop, BottomBar } from './components/garage.tsx'
+import { Backdrop } from './components/garage.tsx'
 import { ToastHost } from './components/overlays.tsx'
 import { TextButton } from './components/ui.tsx'
 import { applyTheme, useDark } from './lib/theme.ts'
 import { getStore, refresh, setUser, updateSettings, useStore } from './lib/store.ts'
 import { api, authEvents } from './lib/api.ts'
-import { depth, noBottomBar, openDeepLink, topLevel, useNav, type Entry, type Route } from './lib/nav.ts'
+import { depth, openDeepLink, useNav, type Entry, type Route } from './lib/nav.ts'
 import { heroBox } from './lib/hero.ts'
 import { lockIfProtected, useLocked } from './lib/lock.ts'
 import { Home } from './screens/Home.tsx'
@@ -80,7 +80,6 @@ function Main({ version, onOnboarding }: { version: string; onOnboarding: () => 
   const loadError = useStore((s) => s.loadError)
   const { stack } = useNav()
   const top = stack[stack.length - 1]
-  const tab = stack.find((e, i) => i > 0 && topLevel.includes(e.route))?.route ?? 'garage'
   if (!data) {
     return (
       <div className="layer">
@@ -92,10 +91,7 @@ function Main({ version, onOnboarding }: { version: string; onOnboarding: () => 
     )
   }
   return (
-    <>
-      <Navigator top={top} render={(entry) => <Screen entry={entry} version={version} onOnboarding={onOnboarding} />} />
-      {!noBottomBar.includes(top.route) && <BottomBar page={tab} />}
-    </>
+    <Navigator top={top} render={(entry) => <Screen entry={entry} version={version} onOnboarding={onOnboarding} />} />
   )
 }
 
@@ -105,8 +101,7 @@ function Screen({ entry, version, onOnboarding }: { entry: Entry; version: strin
     case 'garage': return <Home />
     case 'scadenze': return <Deadlines />
     case 'impostazioni': return <Settings version={version} onOnboarding={onOnboarding} />
-    case 'detail': return <VehicleDetail vehicleId={p.vehicleId!} sectionsPage={false} backLabel={p.from} />
-    case 'sections': return <VehicleDetail vehicleId={p.vehicleId!} sectionsPage />
+    case 'detail': return <VehicleDetail vehicleId={p.vehicleId!} backLabel={p.from} />
     case 'maintenance-detail': return <MaintenanceDetail id={p.id!} />
     case 'reminder-detail': return <ReminderDetail id={p.id!} />
     case 'document-detail': return <DocumentDetail id={p.id!} />
@@ -116,28 +111,24 @@ function Screen({ entry, version, onOnboarding }: { entry: Entry; version: strin
   }
 }
 
-// --- the AnimatedContent of GarageApp: screens grow from the tap, or from the button they open -------
+// --- the AnimatedContent of GarageApp: pages push in from the right, editors rise from the bottom and
+// the car page grows out of its photo on the home.
 
-/** The pairs that use the container transform (buttonHero in MainActivity.kt). */
+/** The pairs that use the container transform: home <-> car page. */
 function heroKey(from: Entry, to: Entry): string | null {
   const pair = (a: Route, b: Route) => (from.route === a && to.route === b) || (from.route === b && to.route === a)
   const deeper = depth[to.route] > depth[from.route] ? to : from
-  if (pair('garage', 'vehicle-editor')) return deeper.params.id ? '' : 'add-vehicle-page'
   if (pair('garage', 'detail')) return `vehicle-page-${deeper.params.vehicleId}`
-  if (pair('detail', 'sections')) return `sections-page-${deeper.params.vehicleId}`
   return null
 }
 
 const ease = 'cubic-bezier(0.4, 0, 0.2, 1)'
-let lastTap: { x: number; y: number; at: number } | null = null
-window.addEventListener('pointerdown', (e) => { lastTap = { x: e.clientX, y: e.clientY, at: performance.now() } }, true)
 
 type Layer = { entry: Entry; leaving: boolean; z: number }
 
 function Navigator({ top, render }: { top: Entry; render: (entry: Entry) => ReactNode }) {
   const container = useRef<HTMLDivElement>(null)
   const nodes = useRef(new Map<number, HTMLDivElement>())
-  const origins = useRef(new Map<number, string>())
   const [layers, setLayers] = useState<Layer[]>([{ entry: top, leaving: false, z: 1 }])
   const pending = useRef<{ from: Entry; to: Entry } | null>(null)
   const shown = layers.find((l) => !l.leaving)!.entry
@@ -167,38 +158,35 @@ function Navigator({ top, render }: { top: Entry; render: (entry: Entry) => Reac
       return animation
     }
 
-    if (key != null) {
-      const hero = key ? heroBox(key, container.current) : null
-      const clip = hero ? `inset(${hero.y}px ${box.width - hero.x - hero.width}px ${box.height - hero.y - hero.height}px ${hero.x}px round ${hero.radius}px)` : null
+    const hero = key ? heroBox(key, container.current) : null
+    if (hero) {
+      const clip = `inset(${hero.y}px ${box.width - hero.x - hero.width}px ${box.height - hero.y - hero.height}px ${hero.x}px round ${hero.radius}px)`
       const full = 'inset(0px 0px 0px 0px round 0px)'
       if (!goingBack) {
-        run(enter, [{ opacity: 0 }, { opacity: 1 }], { duration: 260 })
-        if (clip) run(enter, [{ clipPath: clip }, { clipPath: full }], { duration: 340 })
-        run(exit, [{ opacity: 1 }, { opacity: 0 }], { duration: 140 }).finished.then(done, done)
+        run(enter, [{ clipPath: clip }, { clipPath: full }], { duration: 420 })
+        run(enter, [{ opacity: 0.4 }, { opacity: 1 }], { duration: 200 })
+        run(exit, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 80 }).finished.then(done, done)
       } else {
-        run(enter, [{ opacity: 0 }, { opacity: 1 }], { duration: 120 })
-        if (clip) run(exit, [{ clipPath: full }, { clipPath: clip }], { duration: 340 })
-        run(exit, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 }).finished.then(done, done)
+        run(enter, [{ opacity: 0 }, { opacity: 1 }], { duration: 220 })
+        run(exit, [{ clipPath: full }, { clipPath: clip }], { duration: 380 })
+        run(exit, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, delay: 260 }).finished.then(done, done)
       }
       return
     }
 
-    const recent = lastTap && performance.now() - lastTap.at < 1200
-    const tapOrigin = recent && lastTap
-      ? `${Math.min(100, Math.max(0, ((lastTap.x - box.left) / box.width) * 100))}% ${Math.min(100, Math.max(0, ((lastTap.y - box.top) / box.height) * 100))}%`
-      : '50% 50%'
-    if (!goingBack) {
-      origins.current.set(move.to.key, tapOrigin)
-      enter.style.transformOrigin = tapOrigin
-      run(enter, [{ transform: `scale(${recent ? 0.12 : 0.94})` }, { transform: 'scale(1)' }], { duration: 340 })
-      run(enter, [{ opacity: 0 }, { opacity: 1 }], { duration: 110 })
-      run(exit, [{ opacity: 1 }, { opacity: 0 }], { duration: 150 }).finished.then(done, done)
+    const editor = (goingBack ? move.from : move.to).route.endsWith('editor')
+    if (editor && !goingBack) {
+      run(enter, [{ transform: 'translateY(14%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 380 })
+      run(exit, [{ opacity: 1 }, { opacity: 0 }], { duration: 200 }).finished.then(done, done)
+    } else if (editor) {
+      run(enter, [{ opacity: 0 }, { opacity: 1 }], { duration: 220 })
+      run(exit, [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(14%)', opacity: 0 }], { duration: 300 }).finished.then(done, done)
+    } else if (!goingBack) {
+      run(enter, [{ transform: 'translateX(25%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }], { duration: 380 })
+      run(exit, [{ transform: 'translateX(0)', opacity: 1 }, { transform: 'translateX(-10%)', opacity: 0 }], { duration: 380 }).finished.then(done, done)
     } else {
-      const opened = origins.current.get(move.from.key)
-      exit.style.transformOrigin = opened ?? '50% 50%'
-      run(enter, [{ opacity: 0 }, { opacity: 1 }], { duration: 180 })
-      run(exit, [{ transform: 'scale(1)' }, { transform: `scale(${opened ? 0.12 : 0.96})` }], { duration: 300 })
-      run(exit, [{ opacity: 1 }, { opacity: 0 }], { duration: 110, delay: 190 }).finished.then(done, done)
+      run(enter, [{ transform: 'translateX(-10%)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }], { duration: 380 })
+      run(exit, [{ transform: 'translateX(0)', opacity: 1 }, { transform: 'translateX(25%)', opacity: 0 }], { duration: 340 }).finished.then(done, done)
     }
   })
 

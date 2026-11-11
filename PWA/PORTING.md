@@ -1,5 +1,7 @@
 # Garage · port to PWA
 
+> Novembre 2026: la grafica è stata rifatta in stile "cruscotto" come l'app (carbonio e blu ghiaccio, pagina auto unica senza schede, niente barra in basso). Le tabelle qui sotto descrivono la conversione originale: schermate, colori e transizioni attuali sono quelli di `web/src/lib/theme.ts`, `web/src/components/ui.tsx` e `web/src/App.tsx`.
+
 Status `verified` = walked in a 375×812 browser (light and dark) and, for the home, onboarding, settings and vehicle
 detail, compared with the app on a Pixel emulator. Checklist of the conversion from the Android app (`app/src/main/java/it/dueffe/garage`). Every row:
 native source → web file → status (`todo`, `done`, `verified` = compared with the native app).

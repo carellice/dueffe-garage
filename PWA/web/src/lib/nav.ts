@@ -5,7 +5,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 
 export type Route =
   | 'garage' | 'scadenze' | 'impostazioni'
-  | 'detail' | 'sections'
+  | 'detail'
   | 'maintenance-detail' | 'reminder-detail' | 'document-detail'
   | 'vehicle-editor' | 'maintenance-editor' | 'document-editor'
 
@@ -13,18 +13,16 @@ export type Params = { vehicleId?: string; id?: string; from?: string }
 
 export type Entry = { key: number; route: Route; params: Params }
 
-/** The bottom bar tabs: Garage is the root, every other tab sits right above it. */
+/** The main pages: Garage is the root, Scadenze and Impostazioni sit right above it. */
 export const topLevel: Route[] = ['garage', 'scadenze', 'impostazioni']
 
 /** Depth used by the native transitionSpec to tell "forward" from "back". */
 export const depth: Record<Route, number> = {
-  garage: 0, scadenze: 0, impostazioni: 0, detail: 1, sections: 2,
+  garage: 0, scadenze: 1, impostazioni: 1, detail: 2,
   'maintenance-detail': 3, 'reminder-detail': 3, 'document-detail': 3,
   'vehicle-editor': 4, 'maintenance-editor': 4, 'document-editor': 4,
 }
 
-/** Screens without the floating bottom bar (MainActivity showNavigation). */
-export const noBottomBar: Route[] = ['vehicle-editor', 'maintenance-editor', 'document-editor', 'maintenance-detail', 'reminder-detail', 'document-detail']
 
 let nextKey = 1
 let stack: Entry[] = [{ key: nextKey++, route: 'garage', params: {} }]

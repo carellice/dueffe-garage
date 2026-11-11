@@ -11,8 +11,8 @@ const outline = (pct: number) => `color-mix(in srgb, var(--outline) ${pct}%, tra
 /** MaintenanceIcon: icon in a 34 dp circle. */
 export function FieldIcon({ icon, size = 19 }: { icon: IconName; size?: number }) {
   return (
-    <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--surfaceContainerHigh)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <Icon name={icon} size={size} color="var(--primary)" />
+    <div style={{ width: 34, height: 34, borderRadius: 11, background: 'color-mix(in srgb, var(--primary) 13%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <Icon name={icon} size={size - 1} color="var(--primary)" />
     </div>
   )
 }
@@ -68,8 +68,8 @@ export function MaintenanceInput({ value, onChange, label, icon, suffix, inputMo
 }) {
   const ref = useRef<HTMLInputElement | null>(null)
   return (
-    <OutlinedField value={value} onChange={onChange} label={label} leading={<FieldIcon icon={icon} />} suffix={suffix} radius={16}
-      container="var(--surface)" border={outline(43)} inputMode={inputMode} bold style={style}
+    <OutlinedField value={value} onChange={onChange} label={label} leading={<FieldIcon icon={icon} />} suffix={suffix} radius={14}
+      container="var(--surface)" border={outline(30)} inputMode={inputMode} bold style={style}
       inputRef={(el) => { ref.current = el }}
       onFocusChange={(f) => {
         onFocusChange?.(f)
@@ -96,8 +96,8 @@ export function VehicleFieldFrame({ label, icon, highlighted = false, onClick, t
     </>
   )
   const frame: CSSProperties = {
-    minHeight: 59, borderRadius: 16, background: 'var(--surface)', display: 'flex', alignItems: 'center', padding: '7px 10px',
-    border: `1px solid ${highlighted ? 'var(--primary)' : outline(32)}`, ...style,
+    minHeight: 60, borderRadius: 14, background: 'var(--surface)', display: 'flex', alignItems: 'center', padding: '7px 10px',
+    border: `1px solid ${highlighted ? 'var(--primary)' : 'var(--hairline)'}`, ...style,
   }
   return (
     <div ref={frameRef} style={style?.flex ? { flex: style.flex, minWidth: 0 } : undefined}>
@@ -148,7 +148,7 @@ export function MaintenanceDateField({ label, value, onChange }: { label: string
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Tap onClick={() => setOpen(true)} ripple="var(--onSurface)" style={{ height: 66, borderRadius: 16, background: 'var(--surface)', border: `1px solid ${outline(43)}`,
+      <Tap onClick={() => setOpen(true)} ripple="var(--onSurface)" style={{ height: 66, borderRadius: 14, background: 'var(--surface)', border: '1px solid var(--hairline)',
         display: 'flex', alignItems: 'center', padding: '0 15px' }}>
         <Icon name="calendarNav" size={25} color="var(--primary)" />
         <div style={{ width: 15 }} />
@@ -156,7 +156,6 @@ export function MaintenanceDateField({ label, value, onChange }: { label: string
           <div style={{ color: 'var(--onSurfaceVariant)', fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>{label}</div>
           <div style={{ fontSize: 17, lineHeight: '24px', fontWeight: 600, letterSpacing: 0.5 }}>{value ? dateLabel(value) : 'Seleziona data'}</div>
         </div>
-        <FieldIcon icon="calendarNav" />
       </Tap>
       <DatePickerDialog open={open} value={value} onDismiss={() => setOpen(false)} onConfirm={(d) => { onChange(d); setOpen(false) }} />
     </>

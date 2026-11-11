@@ -1,104 +1,64 @@
-import { motion } from 'framer-motion'
 import { useState, type CSSProperties } from 'react'
-import { Bouncy, Icon, Tap } from './ui.tsx'
+import { Bouncy, Gauge, Icon, Panel, RowDivider, Tap, TintBadge } from './ui.tsx'
 import { Menu } from './overlays.tsx'
-import { alpha, documentAppearance, maintenanceAppearance, urgencyFor, useDark } from '../lib/theme.ts'
+import { deadlineFraction, documentAppearance, maintenanceAppearance, urgencyFor, useDark } from '../lib/theme.ts'
 import { fileUrl } from '../lib/store.ts'
 import type { DueReminder, GarageDocument, Maintenance } from '../../../shared/model.ts'
 import { documentDate, documentFormat, maintenanceLabel, reminderDueDate, reminderStatus, reminderSubtitle } from '../../../shared/logic.ts'
-import { dateLabel, documentSize, euro, formatKm } from '../../../shared/format.ts'
+import { dateLabel, euro, euroRounded, formatKm } from '../../../shared/format.ts'
 
 const muted = 'var(--onSurfaceVariant)'
 
-function TypeBadge({ label, tint, background, radius = 15, padding = '2px 9px' }: { label: string; tint: string; background: string; radius?: number; padding?: string }) {
-  return (
-    <span style={{ alignSelf: 'flex-start', borderRadius: radius, background, padding, color: tint, fontSize: 11, lineHeight: '16px', fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{label}</span>
-  )
-}
-
-/** ReminderListCard of Screens.kt. */
-export function ReminderCard({ item, showVehicle = false, onClick, style }: { item: DueReminder; showVehicle?: boolean; onClick: () => void; style?: CSSProperties }) {
+/** DeadlineRow: a gauge that fills as the date approaches, what it is, the car and how long is left. */
+export function DeadlineRow({ item, showVehicle, onClick }: { item: DueReminder; showVehicle: boolean; onClick: () => void }) {
   const dark = useDark()
   const appearance = maintenanceAppearance(item.maintenance.type, dark)
-  const dueDate = reminderDueDate(item)
   const urgency = urgencyFor(item.days, dark)
-  const urgent = (item.days ?? Number.MAX_SAFE_INTEGER) < 0
-  const title = item.maintenance.type === 'service' ? 'Tagliando periodico' : item.maintenance.type === 'tax' ? 'Bollo auto' : maintenanceLabel(item.maintenance)
+  const date = reminderDueDate(item)
+  const threshold = item.reminder.type !== 'date' && item.reminder.type !== 'interval' ? item.reminder.mileageThreshold : null
+  const detail = [showVehicle ? item.vehicle.name : '', date ? dateLabel(date) : '', threshold != null ? formatKm(threshold) : ''].filter(Boolean).join(' · ')
   return (
-    <Bouncy onClick={onClick} label={`Apri scadenza ${appearance.label}`} style={{
-      borderRadius: 22, background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 12px 13px 16px',
-      position: 'relative', ...style,
-    }}>
-      <div aria-hidden style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: urgency.color }} />
-      {urgent ? (
-        <motion.div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 22, border: `1px solid ${urgency.color}`, pointerEvents: 'none' }}
-          initial={{ opacity: 0.25 + 0.35 * 0.35 }} animate={{ opacity: 0.6 }} transition={{ duration: 0.9, ease: [0.4, 0, 0.2, 1], repeat: Infinity, repeatType: 'reverse' }} />
-      ) : (
-        <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 22, border: '1px solid color-mix(in srgb, var(--outline) 10%, transparent)', pointerEvents: 'none' }} />
-      )}
-      <div style={{ width: 54, height: 54, borderRadius: '50%', background: appearance.background, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Icon name={appearance.icon} size={27} color={appearance.tint} />
+    <Bouncy onClick={onClick} label={`Apri scadenza ${appearance.label}`} pressed={0.985} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', gap: 12 }}>
+      <Gauge fraction={deadlineFraction(item.days)} color={urgency.color} size={46} stroke={3.5}>
+        <Icon name={appearance.icon} size={20} color={urgency.color} />
+      </Gauge>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="ellipsis" style={{ fontSize: 16, lineHeight: '22px', fontWeight: 600 }}>{maintenanceLabel(item.maintenance)}</div>
+        <div className="ellipsis" style={{ color: muted, fontSize: 13, lineHeight: '18px' }}>{detail || reminderSubtitle(item)}</div>
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {showVehicle
-          ? <div className="ellipsis" style={{ color: 'var(--primary)', fontSize: 10, lineHeight: '16px', letterSpacing: 1.5, fontWeight: 900 }}>{item.vehicle.name.toLocaleUpperCase('it-IT')}</div>
-          : <TypeBadge label={appearance.label} tint={appearance.tint} background={appearance.background} />}
-        <div className="clamp2" style={{ fontSize: 15, lineHeight: '20px', fontWeight: 700, letterSpacing: 0.15 }}>{title}</div>
-        <div className="ellipsis" style={{ color: muted, fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>{reminderSubtitle(item)}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          {dueDate && <>
-            <Icon name="calendarNav" size={14} color={muted} />
-            <span style={{ color: muted, fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap', letterSpacing: 0.5 }}>{dateLabel(dueDate)}</span>
-          </>}
-          {item.kmLeft != null && item.reminder.type !== 'mileage' ? <>
-            <span style={{ color: muted, fontSize: 11, lineHeight: '16px' }}>·</span>
-            <Icon name="speedometer" size={14} color={muted} />
-            <span style={{ color: muted, fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap', letterSpacing: 0.5 }}>{item.reminder.mileageThreshold != null ? formatKm(item.reminder.mileageThreshold) : ''}</span>
-          </> : item.reminder.type === 'mileage' && item.reminder.mileageThreshold != null ? <>
-            <Icon name="speedometer" size={14} color={muted} />
-            <span style={{ color: muted, fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap', letterSpacing: 0.5 }}>{formatKm(item.reminder.mileageThreshold)}</span>
-          </> : null}
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderRadius: 24, background: alpha(urgency.color, 0.14), padding: '8px 9px', flexShrink: 0 }}>
-        <Icon name="clock" size={15} color={urgency.color} />
-        <span style={{ color: urgency.color, fontSize: 11, lineHeight: '16px', fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: 0.5 }}>{reminderStatus(item)}</span>
-      </div>
+      <div className="tnum" style={{ color: urgency.color, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>{reminderStatus(item)}</div>
     </Bouncy>
   )
 }
 
-/** MaintenanceListCard of Screens.kt. */
-export function MaintenanceCard({ maintenance, onOpen }: { maintenance: Maintenance; onOpen: () => void }) {
+/** A grouped list of deadlines inside one panel. */
+export function DeadlineGroup({ items, showVehicle, onClick }: { items: DueReminder[]; showVehicle: boolean; onClick: (d: DueReminder) => void }) {
+  return (
+    <Panel padding={0} style={{ overflow: 'hidden' }}>
+      {items.map((d, i) => (
+        <div key={d.reminder.id}>
+          {i > 0 && <RowDivider />}
+          <DeadlineRow item={d} showVehicle={showVehicle} onClick={() => onClick(d)} />
+        </div>
+      ))}
+    </Panel>
+  )
+}
+
+/** One intervention of the history: type badge, date and km, cost. */
+export function MaintenanceRow({ maintenance, onOpen }: { maintenance: Maintenance; onOpen: () => void }) {
   const dark = useDark()
   const appearance = maintenanceAppearance(maintenance.type, dark)
-  const title = maintenance.type === 'inspection' ? 'Revisione periodica' : maintenance.type === 'tax' ? 'Bollo auto' : maintenanceLabel(maintenance)
+  const note = maintenance.notes.split(/\r\n|\r|\n/)[0].trim()
+  const line = [dateLabel(maintenance.date), formatKm(maintenance.mileage), note].filter(Boolean).join(' · ')
   return (
-    <Bouncy onClick={onOpen} label="Apri dettaglio intervento" style={{ borderRadius: 22, background: 'var(--surface)', padding: '14px 15px', display: 'flex', alignItems: 'center' }}>
-      <div style={{ width: 58, height: 58, borderRadius: '50%', background: appearance.background, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Icon name={appearance.icon} size={31} color={appearance.tint} />
+    <Bouncy onClick={onOpen} label="Apri dettaglio intervento" pressed={0.985} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', gap: 12 }}>
+      <TintBadge icon={appearance.icon} tint={appearance.tint} background={appearance.background} size={46} iconSize={22} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="ellipsis" style={{ fontSize: 16, lineHeight: '22px', fontWeight: 600 }}>{maintenanceLabel(maintenance)}</div>
+        <div className="ellipsis" style={{ color: muted, fontSize: 13, lineHeight: '18px' }}>{line}</div>
       </div>
-      <div style={{ width: 12 }} />
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <TypeBadge label={appearance.label} tint={appearance.tint} background={appearance.background} radius={18} padding="3px 10px" />
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 16, lineHeight: '24px', fontWeight: 900, whiteSpace: 'nowrap', letterSpacing: 0.5 }}>{euro(maintenance.cost)}</span>
-        </div>
-        <div className="ellipsis" style={{ fontSize: 17, lineHeight: '24px', fontWeight: 700, letterSpacing: 0.5 }}>{title}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Icon name="calendarNav" size={14} color={muted} />
-          <span style={{ color: muted, fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap', letterSpacing: 0.5 }}>{dateLabel(maintenance.date)}</span>
-          <span style={{ color: muted, fontSize: 12, lineHeight: '16px' }}>·</span>
-          <Icon name="speedometer" size={14} color={muted} />
-          <span style={{ color: muted, fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap', letterSpacing: 0.5 }}>{formatKm(maintenance.mileage)}</span>
-        </div>
-        {maintenance.notes.trim() && (
-          <div className="ellipsis" style={{ color: 'color-mix(in srgb, var(--onSurfaceVariant) 72%, transparent)', fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>
-            {maintenance.notes.split(/\r\n|\r|\n/)[0]}
-          </div>
-        )}
-      </div>
+      <div className="tnum" style={{ fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap' }}>{maintenance.cost % 1 ? euro(maintenance.cost) : euroRounded(maintenance.cost).replace('€', '€ ')}</div>
     </Bouncy>
   )
 }
@@ -112,48 +72,38 @@ export function DocumentThumbnail({ document, category, style, iconSize = 32 }: 
   return (
     <div style={{ width: 72, height: 72, borderRadius: 13, overflow: 'hidden', background: appearance.background, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, ...style }}>
       {image
-        ? <img src={fileUrl('document', document.id, document.updatedAt)} alt="" draggable={false} onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <img src={fileUrl('document', document.id, document.updatedAt)} alt="" draggable={false} decoding="async" onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         : <Icon name="document" size={iconSize} color={appearance.tint} />}
     </div>
   )
 }
 
-/** DocumentListCard of Screens.kt. */
-export function DocumentCard({ document, category, onOpen, onShare, onRename, onDelete }: {
+/** A document as a tile with its preview; the ⋮ button holds the quick actions. */
+export function DocumentTile({ document, category, onOpen, onShare, onRename, onDelete }: {
   document: GarageDocument; category: string; onOpen: () => void; onShare: () => void; onRename: () => void; onDelete: () => void
 }) {
-  const dark = useDark()
-  const appearance = documentAppearance(category, dark)
   const [menu, setMenu] = useState(false)
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null)
   return (
-    <Bouncy onClick={onOpen} label={`Apri ${document.name}`} style={{ borderRadius: 22, background: 'var(--surface)', padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
-      <DocumentThumbnail document={document} category={category} />
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <TypeBadge label={appearance.label} tint={appearance.tint} background={appearance.background} radius={16} />
-        <div className="clamp2" style={{ fontSize: 15, lineHeight: '20px', fontWeight: 700, letterSpacing: 0.15, wordBreak: 'break-word' }}>{document.name}</div>
-        <div style={{ color: muted, fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>{`${documentFormat(document)} · ${documentSize(document.size)}`}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Icon name="calendarNav" size={15} color={muted} />
-          <span style={{ color: muted, fontSize: 12, lineHeight: '16px', letterSpacing: 0.4 }}>{documentDate(document.addedAt)}</span>
+    <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+      <Bouncy onClick={onOpen} label={`Apri ${document.name}`} style={{ borderRadius: 18, background: 'var(--surface)', border: '1px solid var(--hairline)', overflow: 'hidden' }}>
+        <DocumentThumbnail document={document} category={category} style={{ width: '100%', height: 112, borderRadius: 0 }} />
+        <div style={{ padding: '10px 12px' }}>
+          <div className="ellipsis" style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600 }}>{document.name}</div>
+          <div className="ellipsis" style={{ color: muted, fontSize: 12, lineHeight: '16px' }}>{`${documentFormat(document)} · ${documentDate(document.addedAt)}`}</div>
         </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-        <div ref={setAnchor}>
-          <Tap onClick={() => setMenu(true)} label="Altre azioni" style={{ width: 40, height: 40, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: muted }}>
-            <Icon name="more" size={20} />
-          </Tap>
-        </div>
-        <Tap onClick={onShare} style={{ minHeight: 40, borderRadius: 20, display: 'flex', alignItems: 'center', color: 'var(--primary)', fontSize: 12, fontWeight: 500, letterSpacing: 0.1 }}>
-          <Icon name="share" size={19} />
-          <span style={{ width: 4 }} />
-          Condividi
+      </Bouncy>
+      <div ref={setAnchor} style={{ position: 'absolute', top: 6, right: 6 }}>
+        <Tap onClick={() => setMenu(true)} label="Altre azioni" ripple="#FFFFFF" style={{ width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,.45)', color: '#FFFFFF' }}>
+          <Icon name="more" size={18} />
         </Tap>
-        <Menu open={menu} anchor={anchor} onDismiss={() => setMenu(false)} items={[
-          { label: 'Rinomina', onClick: () => { setMenu(false); onRename() } },
-          { label: 'Elimina', onClick: () => { setMenu(false); onDelete() } },
-        ]} />
       </div>
-    </Bouncy>
+      <Menu open={menu} anchor={anchor} onDismiss={() => setMenu(false)} items={[
+        { label: 'Condividi', onClick: () => { setMenu(false); onShare() } },
+        { label: 'Rinomina', onClick: () => { setMenu(false); onRename() } },
+        { label: 'Elimina', onClick: () => { setMenu(false); onDelete() } },
+      ]} />
+    </div>
   )
 }

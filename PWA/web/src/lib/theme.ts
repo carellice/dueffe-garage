@@ -4,35 +4,37 @@ import { useStore } from './store.ts'
 // The two color schemes of MainActivity.kt (darkColorScheme / lightColorScheme) and the brand
 // colors of GarageDesign.kt, as CSS variables.
 
-export const Gold = '#FFD84D'
-export const Amber = '#FF9F1C'
-export const Ember = '#FF6B3D'
-export const Black = '#09080A'
-export const Cream = '#FFF8E9'
-export const Muted = '#B7A98E'
+// Cockpit palette: carbon surfaces, frost text, one ice-blue accent (GarageDesign.kt).
+export const Ice = '#6FD3FF'
+export const IceDeep = '#0A66D0'
+export const Carbon = '#07090C'
+export const CarbonPanel = '#10141A'
+export const CarbonRaised = '#181D25'
+export const Frost = '#EEF1F5'
+export const Steel = '#8B95A7'
 
 type Scheme = Record<string, string>
 
 const dark: Scheme = {
-  primary: Gold, onPrimary: Black, background: Black, surface: '#16141A',
-  surfaceContainerLowest: Black, surfaceContainerLow: '#16141A', surfaceContainer: '#16141A',
-  surfaceContainerHigh: '#221F25', surfaceContainerHighest: '#2C2930', surfaceVariant: '#27242B',
-  onSurfaceVariant: Muted, outline: '#6E6252', outlineVariant: '#49454F', onBackground: Cream, onSurface: Cream,
-  secondary: Muted, secondaryContainer: '#3D3214', onSecondaryContainer: Gold, error: '#FF6B6B',
+  primary: Ice, onPrimary: Carbon, background: Carbon, surface: CarbonPanel,
+  surfaceContainerLowest: Carbon, surfaceContainerLow: CarbonPanel, surfaceContainer: CarbonPanel,
+  surfaceContainerHigh: CarbonRaised, surfaceContainerHighest: '#212733', surfaceVariant: CarbonRaised,
+  onSurfaceVariant: Steel, outline: '#5A6476', outlineVariant: '#2C3340', onBackground: Frost, onSurface: Frost,
+  secondary: Steel, secondaryContainer: 'rgba(111,211,255,.16)', onSecondaryContainer: Ice, error: '#FF5A5F',
   inverseSurface: '#E6E0E9', inverseOnSurface: '#322F35',
-  accentA: Gold, accentB: Amber, onAccent: Black,
+  accentA: Ice, accentB: Ice, onAccent: Carbon,
   hairline: 'rgba(255,255,255,.07)', navHairline: 'rgba(255,255,255,.08)',
 }
 
 const light: Scheme = {
-  primary: '#8A5A00', onPrimary: '#FFFFFF', background: '#F7F3EA', surface: '#FFFFFF',
-  surfaceContainerLowest: '#FFFFFF', surfaceContainerLow: '#FFFCF5', surfaceContainer: '#F8F5ED',
-  surfaceContainerHigh: '#F0EBDF', surfaceContainerHighest: '#E9E2D3', surfaceVariant: '#E9E2D3',
-  onSurfaceVariant: '#665B46', outline: '#85745A', outlineVariant: '#CAC4D0', onBackground: Black, onSurface: Black,
-  secondary: '#665B46', secondaryContainer: '#FFE7A3', onSecondaryContainer: '#3A2A00', error: '#B3261E',
+  primary: IceDeep, onPrimary: '#FFFFFF', background: '#F2F4F7', surface: '#FFFFFF',
+  surfaceContainerLowest: '#FFFFFF', surfaceContainerLow: '#F8F9FB', surfaceContainer: '#F2F4F7',
+  surfaceContainerHigh: '#E9ECF1', surfaceContainerHighest: '#E1E5EC', surfaceVariant: '#E9ECF1',
+  onSurfaceVariant: '#5B6475', outline: '#7A8496', outlineVariant: '#CDD3DC', onBackground: '#0B0D12', onSurface: '#0B0D12',
+  secondary: '#5B6475', secondaryContainer: '#DCE9FB', onSecondaryContainer: '#0A3D7A', error: '#C62828',
   inverseSurface: '#322F35', inverseOnSurface: '#F5EFF7',
-  accentA: '#E0A100', accentB: '#E86A12', onAccent: '#FFFFFF',
-  hairline: 'rgba(0,0,0,.05)', navHairline: 'rgba(0,0,0,.05)',
+  accentA: IceDeep, accentB: IceDeep, onAccent: '#FFFFFF',
+  hairline: 'rgba(0,0,0,.07)', navHairline: 'rgba(0,0,0,.07)',
 }
 
 const media = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null
@@ -64,12 +66,15 @@ export function applyTheme(isDark: boolean) {
 
 /** urgencyFor(days): the deadline palette, readable in both themes. */
 export function urgencyFor(days: number | null, isDark: boolean): { label: string; color: string } {
-  if (days == null) return { label: 'Da verificare', color: isDark ? '#B7A98E' : '#66563C' }
-  if (days < 0) return { label: 'Scaduta', color: isDark ? '#FF6B6B' : '#C62828' }
-  if (days <= 30) return { label: 'Imminente', color: isDark ? '#FF9F43' : '#D35400' }
-  if (days <= 100) return { label: 'In arrivo', color: isDark ? '#FFD84D' : '#9A6B00' }
-  return { label: 'Tranquilla', color: isDark ? '#5FD4A0' : '#1E8A5A' }
+  if (days == null) return { label: 'Da verificare', color: isDark ? Steel : '#5B6475' }
+  if (days < 0) return { label: 'Scaduta', color: isDark ? '#FF5A5F' : '#C62828' }
+  if (days <= 30) return { label: 'Imminente', color: isDark ? '#FFA24C' : '#C75000' }
+  if (days <= 100) return { label: 'In arrivo', color: isDark ? '#FFD45C' : '#8F6A00' }
+  return { label: 'Tranquilla', color: isDark ? '#4FE0A6' : '#138A57' }
 }
+
+/** How full a deadline gauge is: empty a year away, full when due. */
+export const deadlineFraction = (days: number | null) => days == null ? 0 : days <= 0 ? 1 : Math.min(1, Math.max(0.04, 1 - days / 365))
 
 export type Appearance = { label: string; icon: import('./icons.gen.ts').IconName; tint: string; background: string }
 
@@ -101,5 +106,5 @@ export function alpha(hex: string, a: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`
 }
 
-/** accentGradient() */
-export const accentGradient = 'linear-gradient(135deg, var(--accentA), var(--accentB))'
+/** The accent fill (solid in the cockpit look). */
+export const accentGradient = 'var(--primary)'

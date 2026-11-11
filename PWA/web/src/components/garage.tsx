@@ -1,34 +1,43 @@
-import { motion } from 'framer-motion'
 import { type ReactNode } from 'react'
-import { Bouncy, Icon, useGradient } from './ui.tsx'
-import { spring, Stiffness, tween } from './motion.ts'
-import { Amber, Gold, alpha, useDark } from '../lib/theme.ts'
-import { switchTab, type Route } from '../lib/nav.ts'
-import type { IconName } from '../lib/icons.gen.ts'
+import { VehicleImage } from './ui.tsx'
+import { tween } from './motion.ts'
+import { Ice, alpha, useDark } from '../lib/theme.ts'
+import { fileUrl } from '../lib/store.ts'
+import { icons } from '../lib/icons.gen.ts'
+import type { VehicleRow } from '../../../shared/model.ts'
 
-/** Modifier.garageBackdrop(): the theme color plus two slowly drifting warm glows. */
+/** Modifier.cockpitBackdrop(): the theme colour with one faint accent glow at the top, like a lit dashboard. */
 export function Backdrop({ children }: { children?: ReactNode }) {
   const dark = useDark()
-  const glowA = dark ? alpha(Gold, 0.1) : alpha('#FFC94D', 0.22)
-  const glowB = dark ? alpha(Amber, 0.07) : alpha('#FFB38A', 0.18)
-  // r = maxDimension × .55 (and .8 of it); centers drift between two points over 9 s, back and forth.
   return (
-    <div style={{ position: 'absolute', inset: 0, background: 'var(--background)', overflow: 'clip', containerType: 'size' }}>
-      <motion.div style={{ position: 'absolute', width: '110cqmax', height: '110cqmax', marginLeft: '-55cqmax', marginTop: '-55cqmax', borderRadius: '50%',
-        background: `radial-gradient(closest-side, ${glowA}, transparent)` }}
-        initial={{ left: '85%', top: '4%' }} animate={{ left: '60%', top: '10%' }}
-        transition={{ duration: 9, ease: [0.4, 0, 0.2, 1], repeat: Infinity, repeatType: 'reverse' }} />
-      <motion.div style={{ position: 'absolute', width: '88cqmax', height: '88cqmax', marginLeft: '-44cqmax', marginTop: '-44cqmax', borderRadius: '50%',
-        background: `radial-gradient(closest-side, ${glowB}, transparent)` }}
-        initial={{ left: '8%', top: '62%' }} animate={{ left: '28%', top: '54%' }}
-        transition={{ duration: 9, ease: [0.4, 0, 0.2, 1], repeat: Infinity, repeatType: 'reverse' }} />
+    <div style={{ position: 'absolute', inset: 0, background: 'var(--background)', overflow: 'clip' }}>
+      <div style={{ position: 'absolute', left: '-55%', right: '-55%', top: '-75vw', height: '150vw', maxHeight: 900, borderRadius: '50%',
+        background: `radial-gradient(closest-side, color-mix(in srgb, var(--primary) ${dark ? 9 : 6}%, transparent), transparent)` }} />
       {children}
     </div>
   )
 }
 
+/** The car photo, or a carbon backdrop with the outline of the car; the outline scales with the box. */
+export function VehiclePhoto({ v, style }: { v: VehicleRow; style?: React.CSSProperties }) {
+  if (v.hasPhoto) return <VehicleImage src={fileUrl('vehicle', v.id, v.updatedAt)} style={{ width: '100%', height: '100%', ...style }} />
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', containerType: 'size', background: 'linear-gradient(135deg, #1A2230, #07090C)', ...style }}>
+      <div style={{ position: 'absolute', left: '78cqw', top: '25cqh', width: '110cqw', height: '110cqw', marginLeft: '-55cqw', marginTop: '-55cqw', borderRadius: '50%',
+        background: `radial-gradient(closest-side, ${alpha(Ice, 0.22)}, transparent)` }} />
+      <div style={{ position: 'absolute', right: '5cqmin', top: '50%', transform: 'translateY(-50%) rotate(-6deg)', width: 'min(45cqw, 55cqh)', height: 'min(45cqw, 55cqh)', color: 'rgba(255,255,255,.14)' }}>
+        <svg viewBox="0 0 24 24" width="100%" height="100%" dangerouslySetInnerHTML={{ __html: icons.car.body }} />
+      </div>
+    </div>
+  )
+}
+
 /** VehiclePlate: the Italian plate, on two lines for motorcycles and scooters. */
-export function Plate({ plate, type, registrationYear }: { plate: string; type: string; registrationYear: number }) {
+export function Plate({ plate, type, registrationYear, compact = false }: { plate: string; type: string; registrationYear: number; compact?: boolean }) {
+  if (compact) return (
+    <span style={{ display: 'inline-block', flexShrink: 0, borderRadius: 6, background: '#F7F7F2', padding: '4px 9px 4px 14px', color: '#151515', fontSize: 14, lineHeight: '18px',
+      letterSpacing: 1.8, fontWeight: 900, boxShadow: 'inset 7px 0 0 #0755AD', whiteSpace: 'nowrap' }}>{plate.toLocaleUpperCase('it-IT').replace(/\s/g, '')}</span>
+  )
   const twoWheeler = type === 'motorcycle' || type === 'scooter'
   const display = plate.toLocaleUpperCase('it-IT').replace(/\s/g, '')
   const blue = '#0755AD'
@@ -60,47 +69,6 @@ export function Plate({ plate, type, registrationYear }: { plate: string; type: 
           <span style={{ height: 3 }} />
         </div>
       )}
-    </div>
-  )
-}
-
-const destinations: [Route, string, IconName][] = [['garage', 'Garage', 'garageNav'], ['scadenze', 'Scadenze', 'calendarNav'], ['impostazioni', 'Impostazioni', 'settingsNav']]
-
-/** FloatingGarageNavigation: the floating bar with the sliding gradient pill. */
-export function BottomBar({ page }: { page: Route }) {
-  const dark = useDark()
-  const selectedIndex = Math.max(0, destinations.findIndex(([key]) => key === page))
-  const pill = useGradient<HTMLDivElement>()
-  return (
-    <div className="nav-pad" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 5 }}>
-      <div style={{ padding: '10px 22px', pointerEvents: 'none' }}>
-        <div role="tablist" style={{
-          pointerEvents: 'auto', position: 'relative', borderRadius: 34, padding: 6,
-          background: 'color-mix(in srgb, var(--surface) 97%, transparent)', border: '1px solid var(--navHairline)',
-          boxShadow: dark ? `0 12px 24px ${alpha(Gold, 0.18)}, 0 4px 10px ${alpha(Gold, 0.12)}` : '0 12px 24px rgba(0,0,0,.18), 0 4px 10px rgba(0,0,0,.12)',
-        }}>
-          <div style={{ position: 'relative', display: 'flex' }}>
-            <motion.div ref={pill} className="accent-bg" style={{ position: 'absolute', top: 0, left: 0, width: `${100 / destinations.length}%`, height: 58, borderRadius: 28 }}
-              initial={false} animate={{ x: `${selectedIndex * 100}%` }} transition={spring(0.68, Stiffness.MediumLow)} />
-            {destinations.map(([key, label, icon]) => {
-              const selected = key === page
-              const tint = selected ? 'var(--onAccent)' : 'var(--onSurfaceVariant)'
-              return (
-                <Bouncy key={key} role="tab" aria-selected={selected} pressed={0.9} ripple={false} onClick={() => switchTab(key)}
-                  style={{ flex: 1, height: 58, borderRadius: 28, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                  <motion.div initial={false} animate={{ scale: selected ? 1.12 : 1, y: selected ? -1 : 0 }}
-                    transition={{ scale: spring(0.4, Stiffness.Medium), y: spring(0.5, Stiffness.Medium) }}
-                    style={{ color: tint, transition: 'color 250ms' }}>
-                    <Icon name={icon} size={23} />
-                  </motion.div>
-                  <div style={{ height: 3 }} />
-                  <span style={{ color: tint, transition: 'color 250ms', fontSize: 11, lineHeight: '16px', fontWeight: selected ? 800 : 500, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{label}</span>
-                </Bouncy>
-              )
-            })}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
